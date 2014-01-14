@@ -26,21 +26,52 @@ int is_bit_aligned(int nbit, int val)
     return (val&pad)==0;
 }
 
+inline
+int is_mch_420(int fmt)
+{
+    return (fmt == YUVFMT_420P
+            || fmt == YUVFMT_420SP
+            || fmt == YUVFMT_420SPA) ? 1 : 0;
+}
+
+inline
+int is_mch_422(int fmt)
+{
+    return (fmt == YUVFMT_422P
+            || fmt == YUVFMT_422SP
+            || fmt == YUVFMT_422SPA
+            || fmt == YUVFMT_UYVY
+            || fmt == YUVFMT_YUYV) ? 1 : 0;
+}
+
+inline
+int is_mch_pl(int fmt)
+{
+    return (fmt == YUVFMT_420P 
+            || fmt == YUVFMT_422P) ? 1 : 0;
+}
+
+inline
+int is_mch_sp(int fmt)
+{
+    return (fmt == YUVFMT_420SP
+            || fmt == YUVFMT_420SPA
+            || fmt == YUVFMT_422SP
+            || fmt == YUVFMT_422SPA) ? 1 : 0;
+}
+
+inline
+int is_mono_pl(int fmt)
+{
+    return (fmt == YUVFMT_400P) ? 1 : 0;
+}
+
 int get_spl_fmt(int fmt)
 {
-    if (fmt == YUVFMT_420P || fmt == YUVFMT_420SP || fmt == YUVFMT_420SP)
-    {
-        return YUVFMT_420P;
-    }
-    else if (fmt == YUVFMT_422P || fmt == YUVFMT_422SP || 
-            fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        return YUVFMT_422P;
-    }
-    else
-    {
-        return YUVFMT_UNSUPPORT;
-    }
+    if (fmt == YUVFMT_400P)     return YUVFMT_400P; 
+    else if (is_mch_420(fmt))   return YUVFMT_420P;
+    else if (is_mch_422(fmt))   return YUVFMT_422P;
+    else                        return YUVFMT_UNSUPPORT;
 }
 
 void swap_uv(uint8_t **u, uint8_t **v)
@@ -162,14 +193,17 @@ void b8tile_rescan_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
     assert (psrc->w_align == pdst->w_align);
     assert (psrc->h_align == pdst->h_align);
     
-    if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    if (fmt == YUVFMT_400P) {
+        b8tile_rescan_planar(pt, tw, th, tsz, ts, pl, w, h, s);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
         b8tile_rescan_planar(pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = psrc->uv_stride;
         s   = pdst->uv_stride;
         w   = w/2;
-        h   = (fmt == YUVFMT_422P) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         pt += psrc->y_size;
         pl += pdst->y_size;
@@ -181,13 +215,13 @@ void b8tile_rescan_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         
         b8tile_rescan_planar(pt, tw, th, tsz, ts, pl, w, h, s);
     }
-    else if (fmt == YUVFMT_420SP)
+    else if (is_mch_sp(fmt))
     {
         b8tile_rescan_planar(pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = psrc->uv_stride;
         s   = pdst->uv_stride;
-        h   = h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
 
         pt += psrc->y_size;
         pl += pdst->y_size;
@@ -204,21 +238,6 @@ void b8tile_rescan_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
     return;
 }
-
-//void b10tile_rescan_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
-//{
-//    ENTER_FUNC;
-//    
-//    psrc->tile.tw *= 2;
-//    psrc->width   *= 2;
-//    b8tile_rescan_mch(psrc, pdst);
-//    psrc->tile.tw /= 2;
-//    psrc->width   /= 2;
-//    
-//    LEAVE_FUNC;
-//
-//    return;
-//}
 
 /**
  * little endian
@@ -303,7 +322,11 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
     assert (psrc->w_align == pdst->w_align);
     assert (psrc->h_align == pdst->h_align);
     
-    if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    if      (fmt == YUVFMT_400P)
+    {
+        b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
         b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -313,7 +336,7 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         dst_stride  = pdst->uv_stride;
         
         w   = w/2;
-        h   = (fmt == YUVFMT_422P) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -322,7 +345,7 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         
         b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
     }
-    else if (fmt == YUVFMT_420SP || fmt == YUVFMT_422SP)
+    else if (is_mch_sp(fmt))
     {
         b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -331,7 +354,7 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         src_stride  = psrc->uv_stride;
         dst_stride  = pdst->uv_stride;
         
-        h   = (fmt == YUVFMT_422SP) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         b10_unpack_rect(src8, src_stride, dst8, dst_stride, w, h);
     }
@@ -345,26 +368,6 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
     return;
 }
-
-//int b10tile_unpack_2_tile
-//(
-//    uint8_t* tight_base, int tw, int th,  int tsz1, int ts1, 
-//    uint8_t* loose_base, int  w, int  h,  int tsz2, int ts2,
-//)
-//{
-//    int x, y, tx, ty;
-//
-//    for (ty=0, y=0; y<h; y+=th, ++ty) 
-//    {
-//        for (tx=0, x=0; x<w; x+=tw, ++tx) 
-//        {
-//            uint8_t* src = &tight_base[ts1*ty + tsz1*tx];
-//            uint8_t* dst = &loose_base[ts2*ty + tsz2*tx];
-//    
-//            b10_unpack_linear(src, tsz1, dst, tw*th);
-//        }
-//    }
-//}
 
 int b10tile_unpack_planar
 (
@@ -431,14 +434,18 @@ int b10tile_unpack_planar
     uint8_t *pt = psrc->pbuf;
     uint8_t *pl = pdst->pbuf;
     
-    if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    if      (fmt == YUVFMT_400P)
+    {
+        b10tile_unpack_planar(pt, tw, th, tsz, ts, pl, w, h, s);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
         b10tile_unpack_planar(pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = psrc->uv_stride;
         s   = pdst->uv_stride;
         w   = w/2;
-        h   = (fmt == YUVFMT_422P) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         pt += psrc->y_size;
         pl += pdst->y_size;
@@ -450,13 +457,13 @@ int b10tile_unpack_planar
         
         b10tile_unpack_planar(pt, tw, th, tsz, ts, pl, w, h, s);
     }
-    else if (fmt == YUVFMT_420SP)
+    else if (is_mch_sp(fmt))
     {
         b10tile_unpack_planar(pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = psrc->uv_stride;
         s   = pdst->uv_stride;
-        h   = h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
 
         pt += psrc->y_size;
         pl += pdst->y_size;
@@ -490,7 +497,13 @@ int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, in
     yuv->y_stride   = bufw;
     yuv->y_size     = bufw * bufh;
     
-    if (fmt == YUVFMT_420P)
+    if      (fmt == YUVFMT_400P)
+    {
+        yuv->uv_stride  = 0;
+        yuv->uv_size    = 0;
+        yuv->io_size    = yuv->y_size;
+    }
+    else if (fmt == YUVFMT_420P)
     {
         yuv->uv_stride  = yuv->y_stride / 2;
         yuv->uv_size    = yuv->y_size   / 4;
@@ -558,14 +571,6 @@ int set_bufsz_src_raster(yuv_seq_t *yuv)
 
     if (yuv->b10) {
         bufw = bit_saturate(3, bufw * 5 / 4);
-        
-        //if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)  {
-        //    set_bufsz_aligned_b8(yuv, bufw, bufh, 6, 0);
-        //} else if (fmt == YUVFMT_420SP) {
-        //    set_bufsz_aligned_b8(yuv, bufw, bufh, 5, 0);
-        //} else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV) {
-        //    set_bufsz_aligned_b8(yuv, bufw, bufh, 4, 0);
-        //}
     }
     
     set_bufsz_aligned_b8(yuv, bufw, bufh, 0, 0);
@@ -587,7 +592,13 @@ int set_bufsz_src_tile(yuv_seq_t *yuv, int tw, int th, int tsz)
     yuv->y_stride   = sat_div(yuv->w_align, tw) * tsz; 
     yuv->y_size     = sat_div(yuv->h_align, th) * yuv->y_stride;
     
-    if (fmt == YUVFMT_420P)
+    if      (fmt == YUVFMT_400P)
+    {
+        yuv->uv_stride  = 0;
+        yuv->uv_size    = 0;
+        yuv->io_size    = yuv->y_size;
+    }
+    else if (fmt == YUVFMT_420P)
     {
         yuv->uv_stride  = sat_div(yuv->w_align / 2, tw) * tsz;
         yuv->uv_size    = sat_div(yuv->h_align / 2, th) * yuv->uv_stride;
@@ -621,25 +632,6 @@ int set_bufsz_src_tile(yuv_seq_t *yuv, int tw, int th, int tsz)
     
     return yuv->io_size;
 }
-
-/**
- *  set buffer size for tile format in bitdepth=16 
- *  
- *  b10tile_unpack_mch() can be splited into 2 steps
- *      1) b10tile_unpack_2_tile()
- *      2) tile2raster_mch()
- */
-//int set_bufsz_aligned_tile(yuv_seq_t *yuv, int tw, int th)
-//{
-//    ENTER_FUNC;
-//    
-//    int tile_size = tw*th * (yuv->b10 ? 2 : 1);
-//    set_bufsz_src_tile(yuv, tw, th, tile_size);
-//    
-//    LEAVE_FUNC;
-//    
-//    return yuv->io_size;
-//}
 
 void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int b10, int btile, int w_align_bit, int h_align_bit)
 {
@@ -722,7 +714,11 @@ int b10_clip8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
     assert (psrc->w_align == pdst->w_align);
     assert (psrc->h_align == pdst->h_align);
     
-    if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    if      (fmt == YUVFMT_400P)
+    {
+        b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
         b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -732,7 +728,7 @@ int b10_clip8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         dst_stride  = pdst->uv_stride;
         
         w   = w/2;
-        h   = (fmt == YUVFMT_422P) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -741,7 +737,7 @@ int b10_clip8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         
         b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
     }
-    else if (fmt == YUVFMT_420SP)
+    else if (is_mch_sp(fmt))
     {
         b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -749,7 +745,7 @@ int b10_clip8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         dst8       += pdst->y_size; 
         src_stride  = psrc->uv_stride;
         dst_stride  = pdst->uv_stride;
-        h   = (fmt == YUVFMT_422SP) ? h : h/2;
+        h   = is_mch_422(fmt) ? h : h/2;
         
         b10_clip8_planar(src8, src_stride, dst8, dst_stride, w, h);
     }
@@ -766,6 +762,8 @@ int b10_clip8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
 int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 {
+    int fmt = psrc->yuvfmt;
+
     uint8_t* src_y_base = psrc->pbuf;
     uint8_t* src_u_base = src_y_base + psrc->y_size;
     uint8_t* src_v_base = src_u_base + psrc->uv_size;
@@ -785,11 +783,12 @@ int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         uint8_t* dst_y = dst_y_base + y * pdst->y_stride;
         memcpy(dst_y, src_y, w);
     }
-
+    
+    if (fmt==YUVFMT_400P)
+        return 0;
+    
     w   = w/2;
-    if (psrc->yuvfmt == YUVFMT_420P) {
-        h = h/2;
-    }
+    h   = is_mch_422(fmt) ? h : h/2;
     
     for (y=0; y<h; ++y) {
         uint8_t* src_u = src_u_base + y * psrc->uv_stride;
@@ -808,6 +807,8 @@ int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
 int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 {
+    int fmt = psrc->yuvfmt;
+    
     uint8_t* src_y_base = psrc->pbuf;
     uint8_t* src_u_base = src_y_base + psrc->y_size;
     
@@ -828,9 +829,7 @@ int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     }
 
     w   = w/2;
-    if (psrc->yuvfmt == YUVFMT_420SP) {
-        h = h/2;
-    }
+    h   = is_mch_422(fmt) ? h : h/2;
     
     for (y=0; y<h; ++y) {
         uint8_t* src_u = src_u_base + y * psrc->uv_stride;
@@ -904,99 +903,13 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
     assert (psrc->h_align == pdst->h_align);
     assert (pdst->yuvfmt  == get_spl_fmt(fmt));
 
-    if        (fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
+    if (fmt == YUVFMT_400P || fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
         b8mch_p2p(psrc, pdst);    
-    } else if (fmt == YUVFMT_420SP || fmt == YUVFMT_422SP) {
+    } else if (is_mch_sp(fmt)) {
         b8mch_sp2p(psrc, pdst);
     } else if (fmt == YUVFMT_UYVY  || fmt == YUVFMT_YUYV ) {
         b8mch_yuyv2p(psrc, pdst);
     }
-    
-    LEAVE_FUNC;
-    
-    return 0;
-}
-
-int b8mch_spliting_all(yuv_seq_t *psrc, yuv_seq_t *pdst)
-{
-    int fmt = psrc->yuvfmt;
-
-    uint8_t* src_y_base = psrc->pbuf;
-    uint8_t* src_u_base = src_y_base + psrc->y_size;
-    uint8_t* src_v_base = src_u_base + psrc->uv_size;
-    
-    uint8_t* dst_y_base = pdst->pbuf;
-    uint8_t* dst_u_base = dst_y_base + pdst->y_size;
-    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
-    
-    int w   = psrc->w_align; 
-    int h   = psrc->h_align; 
-    int x, y;
-
-    ENTER_FUNC;
-    
-    if (fmt == YUVFMT_UYVY   || fmt == YUVFMT_YUYV ) 
-    {
-        w   = w/2;
-        if (psrc->yuvfmt == YUVFMT_UYVY) {
-            dst_v_base = dst_y_base + pdst->y_size;
-            dst_u_base = dst_v_base + pdst->uv_size;
-        }
-        
-        for (y=0; y<h; ++y) {
-            uint8_t* src_y  = src_y_base + y * psrc->y_stride;
-            
-            uint8_t* dst_y  = dst_y_base + y * pdst->y_stride;
-            uint8_t* dst_u  = dst_u_base + y * pdst->uv_stride;
-            uint8_t* dst_v  = dst_v_base + y * pdst->uv_stride;
-
-            for (x=0; x<w; ++x) {
-                *(dst_y++) = *(src_y++);
-                *(dst_u++) = *(src_y++);
-                *(dst_y++) = *(src_y++);
-                *(dst_v++) = *(src_y++);
-            }
-        }
-    } 
-    else    /* 420p, 420sp, 422p, 422sp*/
-    {
-        for (y=0; y<h; ++y) {
-            uint8_t* src_y = src_y_base + y * psrc->y_stride;
-            uint8_t* dst_y = dst_y_base + y * pdst->y_stride;
-            memcpy(dst_y, src_y, w);
-        }
-        
-        w   = w/2;
-        if (psrc->yuvfmt == YUVFMT_420P || psrc->yuvfmt == YUVFMT_420SP) {
-            h = h/2;
-        }
-        
-        if (fmt == YUVFMT_420SP || fmt == YUVFMT_422SP) 
-        {
-            for (y=0; y<h; ++y) {
-                uint8_t* src_u = src_u_base + y * psrc->uv_stride;
-                uint8_t* dst_u = dst_u_base + y * pdst->uv_stride;
-                uint8_t* dst_v = dst_v_base + y * pdst->uv_stride;
-
-                for (x=0; x<w; ++x) {
-                    *(dst_u++) = *(src_u++);
-                    *(dst_v++) = *(src_u++);
-                }
-            }
-        } 
-        else if (fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) 
-        {
-            for (y=0; y<h; ++y) {
-                uint8_t* src_u = src_u_base + y * psrc->uv_stride;
-                uint8_t* src_v = src_v_base + y * psrc->uv_stride;
-                uint8_t* dst_u = dst_u_base + y * pdst->uv_stride;
-                uint8_t* dst_v = dst_v_base + y * pdst->uv_stride;
-                
-                memcpy(dst_u, src_u, w);
-                memcpy(dst_v, src_v, w);
-            }
-        }
-    }       /* 420p, 420sp, 422p, 422sp*/
     
     LEAVE_FUNC;
     

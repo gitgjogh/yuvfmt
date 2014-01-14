@@ -24,11 +24,13 @@ typedef union _i64_pack {
 } i64_pack_t;
 
 enum {
-    YUVFMT_420P = 0,
+    YUVFMT_400P=0,
+    YUVFMT_420P,
     YUVFMT_420SP,
     YUVFMT_420SPA,
     YUVFMT_422P,
     YUVFMT_422SP,
+    YUVFMT_422SPA,
     YUVFMT_UYVY,
     YUVFMT_YUYV,
     YUVFMT_UNSUPPORT
