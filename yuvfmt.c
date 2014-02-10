@@ -614,9 +614,18 @@ int set_bufsz_src_raster(yuv_seq_t *yuv)
     return yuv->io_size;
 }
 
-int set_bufsz_src_tile(yuv_seq_t *yuv, int tw, int th, int tsz)
+int set_bufsz_src_tile(yuv_seq_t *yuv)
 {
     ENTER_FUNC;
+    
+    int tw      = 0;
+    int th      = 0;
+    int tsz     = 0; 
+    if (yuv->b10) { 
+        tw = 3; th = 4; tsz = 16; 
+    } else { 
+        tw = 8; th = 4; tsz = 32; 
+    }
     
     int fmt = yuv->yuvfmt;
     yuv->tile.tw    = tw;
@@ -956,7 +965,7 @@ int main(int argc, char **argv)
     if (argc<=7)
     {
         printf("prog [1]dst.yuv [2]src.yuv [3]w<int> [4]h<int> [5]start<int> [6]nfrm<int> \n");
-        printf("     [7]srcfmt<str>, [8]b10, [9]btile [10]tw [11]th [12]tsz\n");
+        printf("     [7]srcfmt<str>, [8]b10, [9]btile\n");
         return -1;
     } 
 
@@ -987,9 +996,6 @@ int main(int argc, char **argv)
     int fmt     = YUVFMT_420P;
     int b10     = 0;
     int btile   = 0;
-    int tw      = 0;
-    int th      = 0;
-    int tsz     = 0; 
     
     if (argc>=8) {
         if      ( !strcmp(argv[7], "420p" ) )  fmt = YUVFMT_420P;
@@ -1000,30 +1006,13 @@ int main(int argc, char **argv)
         else if ( !strcmp(argv[7], "yuyv" ) )  fmt = YUVFMT_YUYV;
         else    { printf("error fmt\n");        return -1;  }
     }
-    if (argc>=9) {
-        b10     = atoi(argv[8]);
-    }
-    if (argc>=10) {
-        btile   = atoi(argv[9]);
-        if (btile) {
-            if (argc<12) {
-                printf("tile size(wxh) must be specified under tile format\n");
-                return -1;
-            }
-            tw  = atoi(argv[10]);
-            th  = atoi(argv[11]);
-            if (argc<13) {
-                printf("tile size(byte) must be specified for b10 tile\n");
-                return -1;
-            }
-            tsz = atoi(argv[12]);
-        }
-    }
+    if (argc>=9)  { b10   = atoi(argv[8]); }
+    if (argc>=10) { btile = atoi(argv[9]); }
 
     set_seq_info( &seq_src, w, h, fmt,  b10, btile, 3, 3);
     set_seq_info( &seq_dst, w, h, fmt,  0,      0 , 3, 3);
     
-    if (btile)  set_bufsz_src_tile(&seq_src, tw, th, tsz);
+    if (btile)  set_bufsz_src_tile(&seq_src);
     else        set_bufsz_src_raster(&seq_src);
     
     printf("\n seq_src:\n");       show_yuv_info(&seq_src);
