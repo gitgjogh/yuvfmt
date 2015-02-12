@@ -445,20 +445,65 @@ void b10_linear_unpack(void* b10_base, int n_byte, void* b16_base, int n16)
     }
 }
 
+/**
+ * little endian: 
+ *
+ *   high (10-rbit)|xxxxxxxxxxxxxx|- rbit -| 
+ *    bit      high------------------------> low
+ *    byte         |  3  |  2  |  1  |  0  | 
+ *  
+ *                  high (10-rbit)|00000000|- (32-rbit) --|
+ *    bit      high------------------------> low
+ *  
+ */
+void b10_linear_pack(void* b10_base, int n_byte, void* b16_base, int n16)
+{
+    uint32_t v16 = 0;
+    uint32_t v32 = 0;
+    int rbit = 32;
+    int i32  = 0;
+    int n32  = n_byte >> 2;
+    int i16  = 0;
+    uint32_t* pb10 = (uint32_t*)b10_base;
+    uint16_t* pb16 = (uint16_t*)b16_base;
+    
+    //assert( (n_byte & 0x08) == 0 );
+    //assert( n_byte > (n16*5+3)/4 );
+    
+    while (i32 < n32 && i16 < n16) 
+    {
+        v16 = pb16[i16++];
+        
+        if (rbit<10) {
+            v32   = (v16 & 0x3ff) >> (10 - rbit);               // high rbit
+            pb10[i32++] = v32;
+            rbit += 22;                                         // rbit=32-(10-rbit)
+            v32   = (v16 & 0x3ff) << rbit;                      // low (10-rbit)
+        } else {
+            v32  += (v16 & 0x3ff) << (rbit - 10);
+            rbit -= 10;
+        }
+    }
+}
+
 void b10_rect_unpack
 (
+    int   b_pack,
     void* b10_base, int b10_stride,
     void* b16_base, int b16_stride,
     int   rect_w,   int rect_h
 )
 {
     int x, y;
+    void (*b10_pack_unpack_fp)(void* b10_base, int n_byte, void* b16_base, int n16);
     
     ENTER_FUNC;
     
+    b10_pack_unpack_fp = b_pack ? b10_linear_pack : b10_linear_unpack;
+    
     for (y=0; y<rect_h; ++y) 
     {
-        b10_linear_unpack(b10_base, b10_stride, b16_base, rect_w);
+        b10_pack_unpack_fp(b10_base, b10_stride, b16_base, rect_w);
         b10_base += b10_stride;
         b16_base += b16_stride;
     }
@@ -466,7 +511,7 @@ void b10_rect_unpack
     LEAVE_FUNC;
 }
 
-int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16)
+int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
 {
     int fmt = rect10->yuvfmt;
     
@@ -485,44 +530,44 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16)
     
     if      (fmt == YUVFMT_400P)
     {
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
     else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
         
-        b10_base  += rect10->y_size;
-        b16_base  += rect16->y_size; 
+        b10_base   += rect10->y_size;
+        b16_base   += rect16->y_size; 
         b10_stride  = rect10->uv_stride;
         b16_stride  = rect16->uv_stride;
         
         w   = w/2;
         h   = is_mch_422(fmt) ? h : h/2;
         
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
         
-        b10_base += rect10->uv_size;
-        b16_base += rect16->uv_size;
+        b10_base   += rect10->uv_size;
+        b16_base   += rect16->uv_size;
         
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
     else if (is_mch_sp(fmt))
     {
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
         
-        b10_base  += rect10->y_size;
-        b16_base  += rect16->y_size; 
+        b10_base   += rect10->y_size;
+        b16_base   += rect16->y_size; 
         b10_stride  = rect10->uv_stride;
         b16_stride  = rect16->uv_stride;
         
         h   = is_mch_422(fmt) ? h : h/2;
         
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
     else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
     {
         w   = w*2;
-        b10_rect_unpack(b10_base, b10_stride, b16_base, b16_stride, w, h);
+        b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
     
     LEAVE_FUNC;
@@ -565,6 +610,7 @@ int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
 
 int b10_tile_unpack
 (
+    int      b_pack,
     uint8_t* tile10_base, int tw, int th, int tsz, int ts, 
     uint8_t* rect16_base, int w,  int h,  int s
 )
@@ -593,13 +639,18 @@ int b10_tile_unpack
     {
         for (tx=0, x=0; x<w; x+=tw, ++tx) 
         {
-            uint8_t* src = &tile10_base[ts*ty + tsz*tx];
-            uint8_t* dst = &rect16_base[s * y + sizeof(uint16_t) * x];
+            uint8_t* p10 = &tile10_base[ts*ty + tsz*tx];
+            uint8_t* p16 = &rect16_base[s * y + sizeof(uint16_t) * x];
             
-            b10_linear_unpack(src, tsz, unpack_base, tw*th);
-            b16_rect_transpose(unpack_base, tw, th);
-            
-            b8_linear_2_rect(unpack_base, tw*2, th, dst, s);
+            if (b_pack) {
+                b8_rect_2_linear(unpack_base, tw*2, th, p16, s);
+                b16_rect_transpose(unpack_base, tw, th);
+                b10_linear_pack(p10, tsz, unpack_base, tw*th);
+            } else {
+                b10_linear_unpack(p10, tsz, unpack_base, tw*th);
+                b16_rect_transpose(unpack_base, tw, th);
+                b8_linear_2_rect(unpack_base, tw*2, th, p16, s);
+            }
         }
     }
     
@@ -613,7 +664,7 @@ int b10_tile_unpack
     return w*h;
 }
 
-int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16)
+int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
 {
     int fmt = tile10->yuvfmt;
 
@@ -631,11 +682,11 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16)
     
     if      (fmt == YUVFMT_400P)
     {
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = tile10->uv_stride;
         s   = rect16->uv_stride;
@@ -645,16 +696,16 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16)
         pt += tile10->y_size;
         pl += rect16->y_size;
         
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
         
         pt += tile10->uv_size;
         pl += rect16->uv_size;
         
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (is_mch_sp(fmt))
     {
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = tile10->uv_stride;
         s   = rect16->uv_stride;
@@ -663,12 +714,12 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16)
         pt += tile10->y_size;
         pl += rect16->y_size;
         
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
     {
         w   = w*2;
-        b10_tile_unpack(pt, tw, th, tsz, ts, pl, w, h, s);
+        b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     
     LEAVE_FUNC;
@@ -1236,11 +1287,10 @@ int main(int argc, char **argv)
 
         if (b10) {
             if (btile) {
-                b10_tile_unpack_mch(&seq_src, &seq_b16);
+                b10_tile_unpack_mch(&seq_src, &seq_b16, 0);
             } else {
-                b10_rect_unpack_mch(&seq_src, &seq_b16);
+                b10_rect_unpack_mch(&seq_src, &seq_b16, 0);
             }
-            
             
 /*
             seq_b16.fp = fopen("seq_b16.yuv","wb");
