@@ -81,62 +81,62 @@ void swap_uv(uint8_t **u, uint8_t **v)
     *v = m;
 }
 
-void b8_linear_2_rect_align_0(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_linear_2_rect_align_0(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; ++i) {
-            *((uint8_t*)(rect+i)) = *((uint8_t*)(tile+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; ++i) {
+            *((uint8_t*)(rect+i)) = *((uint8_t*)(line+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_linear_2_rect_align_4(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_linear_2_rect_align_4(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; i+=4) {
-            *((uint32_t*)(rect+i)) = *((uint32_t*)(tile+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; i+=4) {
+            *((uint32_t*)(rect+i)) = *((uint32_t*)(line+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_linear_2_rect_align_8(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_linear_2_rect_align_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; i+=8) {
-            *((uint64_t*)(rect+i)) = *((uint64_t*)(tile+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; i+=8) {
+            *((uint64_t*)(rect+i)) = *((uint64_t*)(line+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_linear_2_rect_width_8(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_linear_2_rect_width_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        *((uint64_t*)(rect)) = *((uint64_t*)(tile));
-        tile += tw;
+    for (j=0; j<h; ++j) {
+        *((uint64_t*)(rect)) = *((uint64_t*)(line));
+        line += w;
         rect += s;
     }
 }
 
-void b8_linear_2_rect(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_linear_2_rect(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
-    if      ( ((int)tile&3) || (tw&3) || ((int)rect&3) || (s&3) )
-        b8_linear_2_rect_align_0(tile, tw, th, rect, s);
-    else if ( ((int)tile&7) || (tw&7) || ((int)rect&7) || (s&7) )
-        b8_linear_2_rect_align_4(tile, tw, th, rect, s);
-    else if ( tw == 8 )
-        b8_linear_2_rect_width_8(tile, tw, th, rect, s); 
+    if      ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) )
+        b8_linear_2_rect_align_0(line, rect, w, h, s);
+    else if ( ((int)line&7) || (w&7) || ((int)rect&7) || (s&7) )
+        b8_linear_2_rect_align_4(line, rect, w, h, s);
+    else if ( w == 8 )
+        b8_linear_2_rect_width_8(line, rect, w, h, s); 
     else
-        b8_linear_2_rect_align_8(tile, tw, th, rect, s);   
+        b8_linear_2_rect_align_8(line, rect, w, h, s);   
 }
 
 void b8_tile_2_rect
@@ -146,18 +146,18 @@ void b8_tile_2_rect
 )
 {
     int x, y, tx, ty;
-    void (*tile2rect_func_p)(uint8_t* src, int tw, int th, uint8_t* dst, int s);
+    void (*line2rect_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
     
     ENTER_FUNC;
 
     if      ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) )
-        tile2rect_func_p = b8_linear_2_rect_align_0;
+        line2rect_func_p = b8_linear_2_rect_align_0;
     else if ( ((int)pl&7) || (tw&7) || (tsz&7) || (ts&7) || ((int)pl&7) || (s&7) )
-        tile2rect_func_p = b8_linear_2_rect_align_4;
+        line2rect_func_p = b8_linear_2_rect_align_4;
     else if ( tw == 8 )
-        tile2rect_func_p = b8_linear_2_rect_width_8; 
+        line2rect_func_p = b8_linear_2_rect_width_8; 
     else
-        tile2rect_func_p = b8_linear_2_rect_align_8;     
+        line2rect_func_p = b8_linear_2_rect_align_8;     
 
     for (ty=0, y=0; y<h; y+=th, ++ty) 
     {
@@ -166,7 +166,7 @@ void b8_tile_2_rect
             uint8_t* src = &pt[ts*ty + tsz*tx];
             uint8_t* dst = &pl[s * y + x];
 
-            tile2rect_func_p(src, tw, th, dst, s);
+            line2rect_func_p(src, dst, tw, th, s);
         }
     } 
     
@@ -239,62 +239,62 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     return;
 }
 
-void b8_rect_2_linear_align_0(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_rect_2_linear_align_0(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; ++i) {
-            *((uint8_t*)(tile+i)) = *((uint8_t*)(rect+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; ++i) {
+            *((uint8_t*)(line+i)) = *((uint8_t*)(rect+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_rect_2_linear_align_4(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_rect_2_linear_align_4(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; i+=4) {
-            *((uint32_t*)(tile+i)) = *((uint32_t*)(rect+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; i+=4) {
+            *((uint32_t*)(line+i)) = *((uint32_t*)(rect+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_rect_2_linear_align_8(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_rect_2_linear_align_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        for (i=0; i<tw; i+=8) {
-            *((uint64_t*)(tile+i)) = *((uint64_t*)(rect+i));
+    for (j=0; j<h; ++j) {
+        for (i=0; i<w; i+=8) {
+            *((uint64_t*)(line+i)) = *((uint64_t*)(rect+i));
         }
-        tile += tw;
+        line += w;
         rect += s;
     }
 }
 
-void b8_rect_2_linear_width_8(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_rect_2_linear_width_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
-    for (j=0; j<th; ++j) {
-        *((uint64_t*)(tile)) = *((uint64_t*)(rect));
-        tile += tw;
+    for (j=0; j<h; ++j) {
+        *((uint64_t*)(line)) = *((uint64_t*)(rect));
+        line += w;
         rect += s;
     }
 }
 
-void b8_rect_2_linear(uint8_t* tile, int tw, int th, uint8_t* rect, int s)
+void b8_rect_2_linear(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
-    if      ( ((int)tile&3) || (tw&3) || ((int)rect&3) || (s&3) )
-        b8_rect_2_linear_align_0(tile, tw, th, rect, s);
-    else if ( ((int)tile&7) || (tw&7) || ((int)rect&7) || (s&7) )
-        b8_rect_2_linear_align_4(tile, tw, th, rect, s);
-    else if ( tw == 8 )
-        b8_rect_2_linear_width_8(tile, tw, th, rect, s); 
+    if      ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) )
+        b8_rect_2_linear_align_0(line, rect, w, h, s);
+    else if ( ((int)line&7) || (w&7) || ((int)rect&7) || (s&7) )
+        b8_rect_2_linear_align_4(line, rect, w, h, s);
+    else if ( w == 8 )
+        b8_rect_2_linear_width_8(line, rect, w, h, s); 
     else
-        b8_rect_2_linear_align_8(tile, tw, th, rect, s);   
+        b8_rect_2_linear_align_8(line, rect, w, h, s);   
 }
 
 void b8_rect_2_tile
@@ -304,18 +304,18 @@ void b8_rect_2_tile
 )
 {
     int x, y, tx, ty;
-    void (*rect2tile_func_p)(uint8_t* src, int tw, int th, uint8_t* dst, int s);
+    void (*rect2line_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
     
     ENTER_FUNC;
 
     if      ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) )
-        rect2tile_func_p = b8_rect_2_linear_align_0;
+        rect2line_func_p = b8_rect_2_linear_align_0;
     else if ( ((int)pl&7) || (tw&7) || (tsz&7) || (ts&7) || ((int)pl&7) || (s&7) )
-        rect2tile_func_p = b8_rect_2_linear_align_4;
+        rect2line_func_p = b8_rect_2_linear_align_4;
     else if ( tw == 8 )
-        rect2tile_func_p = b8_rect_2_linear_width_8; 
+        rect2line_func_p = b8_rect_2_linear_width_8; 
     else
-        rect2tile_func_p = b8_rect_2_linear_align_8;     
+        rect2line_func_p = b8_rect_2_linear_align_8;     
 
     for (ty=0, y=0; y<h; y+=th, ++ty) 
     {
@@ -324,7 +324,7 @@ void b8_rect_2_tile
             uint8_t* tile = &pt[ts*ty + tsz*tx];
             uint8_t* rect = &pl[s * y + x];
 
-            rect2tile_func_p(tile, tw, th, rect, s);
+            rect2line_func_p(tile, rect, tw, th, s);
         }
     } 
     
@@ -398,7 +398,7 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
 }
 
 /**
- * little endian: 
+ * unpack 10-bit compact pixels to 16 (low 10-bit)
  *      - i32_0 is used for bitop
  *      - i32_1 is used for reading 
  *
@@ -410,7 +410,7 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
  *    bit      high------------------------> low
  *  
  */
-void b10_linear_unpack(void* b10_base, int n_byte, void* b16_base, int n16)
+void b10_linear_unpack_lte(void* b10_base, int n_byte, void* b16_base, int n16)
 {
     register i64_pack_t bp;
     
@@ -446,14 +446,14 @@ void b10_linear_unpack(void* b10_base, int n_byte, void* b16_base, int n16)
 }
 
 /**
- * little endian: 
+ * pack low 10-bit in 16 to 10-bit compact format
  *
  *                 |xxxxxxxxxxxxxx|- rbit -| 
  *    bit      high------------------------> low
  *    byte         |  3  |  2  |  1  |  0  | 
  *  
  */
-void b10_linear_pack(void* b10_base, int n_byte, void* b16_base, int n16)
+void b10_linear_pack_lte(void* b10_base, int n_byte, void* b16_base, int n16)
 {
     uint32_t v16 = 0;
     uint32_t v32 = 0;
@@ -496,7 +496,7 @@ void b10_rect_unpack
     
     ENTER_FUNC;
     
-    b10_pack_unpack_fp = b_pack ? b10_linear_pack : b10_linear_unpack;
+    b10_pack_unpack_fp = b_pack ? b10_linear_pack_lte : b10_linear_unpack_lte;
     
     for (y=0; y<rect_h; ++y) 
     {
@@ -640,13 +640,13 @@ int b10_tile_unpack
             uint8_t* p16 = &rect16_base[s * y + sizeof(uint16_t) * x];
             
             if (b_pack) {
-                b8_rect_2_linear(unpack_base, tw*2, th, p16, s);
+                b8_rect_2_linear(unpack_base, p16, tw*2, th, s);
                 b16_rect_transpose(unpack_base, tw, th);
-                b10_linear_pack(p10, tsz, unpack_base, tw*th);
+                b10_linear_pack_lte(p10, tsz, unpack_base, tw*th);
             } else {
-                b10_linear_unpack(p10, tsz, unpack_base, tw*th);
+                b10_linear_unpack_lte(p10, tsz, unpack_base, tw*th);
                 b16_rect_transpose(unpack_base, tw, th);
-                b8_linear_2_rect(unpack_base, tw*2, th, p16, s);
+                b8_linear_2_rect(unpack_base, p16, tw*2, th, s);
             }
         }
     }
