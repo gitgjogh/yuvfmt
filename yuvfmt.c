@@ -14,7 +14,7 @@ inline int sat_div(int num, int den)
     return (num + den - 1)/den;
 }
 
-int bit_saturate(int nbit, int val)
+int bit_sat(int nbit, int val)
 {
     int pad = (1<<nbit) - 1;
     return (val+pad) & (~pad);
@@ -44,15 +44,22 @@ int is_mch_422(int fmt)
             || fmt == YUVFMT_YUYV) ? 1 : 0;
 }
 
+inline 
+int is_mch_mixed(int fmt)
+{
+    return (fmt == YUVFMT_UYVY 
+            || fmt == YUVFMT_YUYV) ? 1 : 0;
+}
+
 inline
-int is_mch_pl(int fmt)
+int is_mch_planar(int fmt)
 {
     return (fmt == YUVFMT_420P 
             || fmt == YUVFMT_422P) ? 1 : 0;
 }
 
 inline
-int is_mch_sp(int fmt)
+int is_semi_planar(int fmt)
 {
     return (fmt == YUVFMT_420SP
             || fmt == YUVFMT_420SPA
@@ -61,7 +68,7 @@ int is_mch_sp(int fmt)
 }
 
 inline
-int is_mono_pl(int fmt)
+int is_mono_planar(int fmt)
 {
     return (fmt == YUVFMT_400P) ? 1 : 0;
 }
@@ -215,7 +222,7 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
         
         b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
     }
-    else if (is_mch_sp(fmt))
+    else if (is_semi_planar(fmt))
     {
         b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
         
@@ -373,7 +380,7 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
         
         b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
     }
-    else if (is_mch_sp(fmt))
+    else if (is_semi_planar(fmt))
     {
         b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
         
@@ -548,7 +555,7 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
         
         b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
-    else if (is_mch_sp(fmt))
+    else if (is_semi_planar(fmt))
     {
         b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
         
@@ -700,7 +707,7 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
         
         b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
-    else if (is_mch_sp(fmt))
+    else if (is_semi_planar(fmt))
     {
         b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
         
@@ -733,8 +740,8 @@ int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, in
 
     ENTER_FUNC;
     
-    bufw = bit_saturate(w_align_bit, bufw);
-    bufh = bit_saturate(h_align_bit, bufh);
+    bufw = bit_sat(w_align_bit, bufw);
+    bufh = bit_sat(h_align_bit, bufh);
     assert( is_bit_aligned(1, bufw) );
     
     yuv->y_stride   = bufw;
@@ -775,7 +782,7 @@ int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, in
         yuv->io_size    = yuv->y_size;
     }
     
-    yuv->buf_size = bit_saturate(7, yuv->io_size);
+    yuv->buf_size = bit_sat(7, yuv->io_size);
     
     LEAVE_FUNC;
 
@@ -794,7 +801,7 @@ int set_bufsz_aligned(yuv_seq_t *yuv)
         yuv->uv_stride  *= 2;
         yuv->uv_size    *= 2;
         yuv->io_size    *= 2;
-        yuv->buf_size   = bit_saturate(8, yuv->io_size);
+        yuv->buf_size   = bit_sat(8, yuv->io_size);
     }
     
     LEAVE_FUNC;
@@ -813,7 +820,7 @@ int set_bufsz_src_raster(yuv_seq_t *yuv)
     ENTER_FUNC;
 
     if (yuv->b10) {
-        bufw = bit_saturate(2, bufw * 5 / 4);
+        bufw = bit_sat(2, bufw * 5 / 4);
     }
     
     set_bufsz_aligned_b8(yuv, bufw, bufh, 0, 0);
@@ -878,7 +885,7 @@ int set_bufsz_src_tile(yuv_seq_t *yuv)
         yuv->io_size    = yuv->y_size;
     }
     
-    yuv->buf_size = bit_saturate(7, yuv->io_size);
+    yuv->buf_size = bit_sat(7, yuv->io_size);
     
     LEAVE_FUNC;
     
@@ -891,8 +898,8 @@ void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int b10, int btile, int
     
     yuv->width      = w;
     yuv->height     = h;
-    yuv->w_align    = bit_saturate( w_align_bit, yuv->width  );
-    yuv->h_align    = bit_saturate( h_align_bit, yuv->height );
+    yuv->w_align    = bit_sat( w_align_bit, yuv->width  );
+    yuv->h_align    = bit_sat( h_align_bit, yuv->height );
     yuv->yuvfmt     = fmt;
     yuv->b10        = b10;
     yuv->btile      = btile;
@@ -989,7 +996,7 @@ int b16_rect_clip_10to8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
         
         b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
     }
-    else if (is_mch_sp(fmt))
+    else if (is_semi_planar(fmt))
     {
         b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
         
@@ -1157,7 +1164,7 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
     if (fmt == YUVFMT_400P || fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
         b8mch_p2p(psrc, pdst);    
-    } else if (is_mch_sp(fmt)) {
+    } else if (is_semi_planar(fmt)) {
         b8mch_sp2p(psrc, pdst);
     } else if (fmt == YUVFMT_UYVY  || fmt == YUVFMT_YUYV ) {
         b8mch_yuyv2p(psrc, pdst);
