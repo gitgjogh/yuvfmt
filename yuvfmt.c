@@ -1090,7 +1090,11 @@ int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     return 0;
 }
 
-int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+/**
+ *  @psrc : semi planar
+ *  @pdst : yuv planar
+ */
+int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2sp)
 {
     int fmt = psrc->yuvfmt;
     
@@ -1121,9 +1125,16 @@ int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         uint8_t* dst_u = dst_u_base + y * pdst->uv_stride;
         uint8_t* dst_v = dst_v_base + y * pdst->uv_stride;
 
-        for (x=0; x<w; ++x) {
-            *(dst_u++) = *(src_u++);
-            *(dst_v++) = *(src_u++);
+        if (b_p2sp) {
+            for (x=0; x<w; ++x) {
+                *(src_u++) = *(dst_u++);
+                *(src_u++) = *(dst_v++);
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *(dst_u++) = *(src_u++);
+                *(dst_v++) = *(src_u++);
+            }
         }
     }
     
@@ -1132,7 +1143,11 @@ int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     return 0;
 }
 
-int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+/**
+ *  @psrc : uyvy or yuyv
+ *  @pdst : yuv planar
+ */
+int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2yuyv)
 {
     uint8_t* src_y_base = psrc->pbuf;
     
@@ -1155,19 +1170,37 @@ int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         uint8_t* dst_u  = dst_u_base + y * pdst->uv_stride;
         uint8_t* dst_v  = dst_v_base + y * pdst->uv_stride;
 
-        if (psrc->yuvfmt == YUVFMT_YUYV) {
-            for (x=0; x<w; ++x) {
-                *(dst_y++) = *(src_y++);
-                *(dst_u++) = *(src_y++);
-                *(dst_y++) = *(src_y++);
-                *(dst_v++) = *(src_y++);
+        if (b_p2yuyv) {
+            if (psrc->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(src_y++) = *(dst_y++);
+                    *(src_y++) = *(dst_u++);
+                    *(src_y++) = *(dst_y++);
+                    *(src_y++) = *(dst_v++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(src_y++) = *(dst_u++);
+                    *(src_y++) = *(dst_y++);
+                    *(src_y++) = *(dst_v++);
+                    *(src_y++) = *(dst_y++);
+                }
             }
         } else {
-            for (x=0; x<w; ++x) {
-                *(dst_u++) = *(src_y++);
-                *(dst_y++) = *(src_y++);
-                *(dst_v++) = *(src_y++);
-                *(dst_y++) = *(src_y++);
+            if (psrc->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(dst_y++) = *(src_y++);
+                    *(dst_u++) = *(src_y++);
+                    *(dst_y++) = *(src_y++);
+                    *(dst_v++) = *(src_y++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(dst_u++) = *(src_y++);
+                    *(dst_y++) = *(src_y++);
+                    *(dst_v++) = *(src_y++);
+                    *(dst_y++) = *(src_y++);
+                }
             }
         }
     }   /* end for y*/
@@ -1191,9 +1224,9 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
     if (fmt == YUVFMT_400P || fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
         b8mch_p2p(psrc, pdst);    
     } else if (is_semi_planar(fmt)) {
-        b8mch_sp2p(psrc, pdst);
+        b8mch_sp2p(psrc, pdst, 0);
     } else if (fmt == YUVFMT_UYVY  || fmt == YUVFMT_YUYV ) {
-        b8mch_yuyv2p(psrc, pdst);
+        b8mch_yuyv2p(psrc, pdst, 0);
     }
     
     LEAVE_FUNC;
