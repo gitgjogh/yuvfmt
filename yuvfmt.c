@@ -1045,44 +1045,58 @@ int b16_rect_clip_10to8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
     return 0;
 }
 
+/**
+ *  support 422p <-> 420p uv down/up sampling
+ */
 int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 {
-    int fmt = psrc->yuvfmt;
+    int src_fmt = psrc->yuvfmt;
+    int dst_fmt = pdst->yuvfmt;
 
-    uint8_t* src_y_base = psrc->pbuf;
-    uint8_t* src_u_base = src_y_base + psrc->y_size;
-    uint8_t* src_v_base = src_u_base + psrc->uv_size;
+    uint8_t* src_y_base = psrc->pbuf;                   uint8_t* src_y = src_y_base;
+    uint8_t* src_u_base = src_y_base + psrc->y_size;    uint8_t* src_u = src_u_base;
+    uint8_t* src_v_base = src_u_base + psrc->uv_size;   uint8_t* src_v = src_v_base;
     
-    uint8_t* dst_y_base = pdst->pbuf;
-    uint8_t* dst_u_base = dst_y_base + pdst->y_size;
-    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
+    uint8_t* dst_y_base = pdst->pbuf;                   uint8_t* dst_y = dst_y_base;
+    uint8_t* dst_u_base = dst_y_base + pdst->y_size;    uint8_t* dst_u = dst_u_base;
+    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;   uint8_t* dst_v = dst_v_base;
+
+    int src_uv_shift = is_mch_420(src_fmt) ? 0 : psrc->uv_stride;
+    int dst_uv_shift = is_mch_420(dst_fmt) ? 0 : pdst->uv_stride;
     
     int w   = psrc->w_align; 
     int h   = psrc->h_align; 
-    int x, y;
+    int y;
 
     ENTER_FUNC;
     
     for (y=0; y<h; ++y) {
-        uint8_t* src_y = src_y_base + y * psrc->y_stride;
-        uint8_t* dst_y = dst_y_base + y * pdst->y_stride;
         memcpy(dst_y, src_y, w);
+        dst_y += pdst->y_stride;
+        src_y += psrc->y_stride;
     }
     
-    if (fmt==YUVFMT_400P)
+    if (src_fmt==YUVFMT_400P || dst_fmt==YUVFMT_400P)
         return 0;
     
     w   = w/2;
-    h   = is_mch_422(fmt) ? h : h/2;
+    h   = h/2;
     
-    for (y=0; y<h; ++y) {
-        uint8_t* src_u = src_u_base + y * psrc->uv_stride;
-        uint8_t* src_v = src_v_base + y * psrc->uv_stride;
-        uint8_t* dst_u = dst_u_base + y * pdst->uv_stride;
-        uint8_t* dst_v = dst_v_base + y * pdst->uv_stride;
+    for (y=0; y<h; ++y) 
+    {
+        dst_u += pdst->uv_stride + dst_uv_shift;
+        src_u += psrc->uv_stride + src_uv_shift;
+        dst_v += pdst->uv_stride + dst_uv_shift;
+        src_v += psrc->uv_stride + src_uv_shift;
         
         memcpy(dst_u, src_u, w);
         memcpy(dst_v, src_v, w);
+        
+        if (dst_uv_shift>0) 
+        {
+            memcpy(dst_u + dst_uv_shift, src_u + src_uv_shift, w);
+            memcpy(dst_v + dst_uv_shift, src_v + src_uv_shift, w);
+        }
     }
     
     LEAVE_FUNC;
