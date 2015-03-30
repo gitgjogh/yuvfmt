@@ -1,4 +1,18 @@
-
+/*****************************************************************************
+ * Copyright 2014 Jeff <ggjogh@gmail.com>
+ *****************************************************************************
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*****************************************************************************/
 
 #ifndef YUVFMT_H_
 #define YUVFMT_H_
@@ -15,6 +29,10 @@
 #define W_ALIGN_SIZE    (1<<W_ALIGN_BIT)
 #define H_ALIGN_SIZE    (1<<H_ALIGN_BIT)
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a)   (sizeof(a)/sizeof(a[0]))
+#endif
+
 typedef union _i64_pack {
     uint64_t i64;
     struct {
@@ -24,6 +42,7 @@ typedef union _i64_pack {
 } i64_pack_t;
 
 enum {
+    YUVFMT_UNKNOWN,
     YUVFMT_400P=0,
     YUVFMT_420P,
     YUVFMT_420SP,
@@ -65,14 +84,12 @@ typedef struct _tile
 
 typedef struct _yuv_seq 
 {
-    //char    name[MAX_PATH];
-    FILE*   fp;
     int     width;
     int     height;
     int     w_align;
     int     h_align;
     int     yuvfmt;
-    int     b10;
+    int     nlsb;
     int     btile;
     
     tile_t  tile;
@@ -87,5 +104,18 @@ typedef struct _yuv_seq
 
 } yuv_seq_t;
 
+typedef struct _yuv_cfg
+{
+    int     frame_range[2];
+
+    char*       src_path;
+    FILE*       src_fp;
+    yuv_seq_t   src;
+
+    char*       dst_path;
+    FILE*       dst_fp;
+    yuv_seq_t   dst;
+    
+} yuv_cfg_t;
 
 #endif

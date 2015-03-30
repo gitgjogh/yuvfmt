@@ -1,13 +1,83 @@
-#include<stdio.h>
-#include<string.h>
-#include<malloc.h>
-#include<assert.h>
+/*****************************************************************************
+ * Copyright 2014 Jeff <ggjogh@gmail.com>
+ *****************************************************************************
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*****************************************************************************/
+
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
+#include <assert.h>
+#include <limits.h>
 
 #include "yuvfmt.h"
 
+enum {
+    B16_2_B10   = 0,
+    B10_2_B16   = 1,
+    
+    B16_2_B8    = 0,
+    B8_2_B16    = 1,
+    
+    TILE_0      = 0,
+    TILE_1      = 1,
+    
+    BIT_8       = 8,
+    BIT_10      = 10,
+    
+    ITL_2_SPL   = 0,
+    SPL_2_ITL   = 1,
+};
+
+typedef struct resolution {
+    const char *name; 
+    int         w, h;
+} res_t;
+const static res_t cmn_res[] = {
+    {"qcif",    176,    144},
+    {"cif",     352,    288},
+    {"360",     480,    360},
+    {"480",     720,    480},
+    {"720",     1280,   720},
+    {"1080",    1920,   1080},
+    {"2k",      1920,   1080},
+    {"1088",    1920,   1088},
+    {"2k+",     1920,   1088},
+    {"2160",    3840,   2160},
+    {"4k",      3840,   2160},
+    {"2176",    3840,   2176},
+    {"4k+",     3840,   2176},
+};
+
+typedef struct yuvformat {
+    const char *name; 
+    int         ifmt;
+} fmt_t;
+const static fmt_t cmn_fmt[] = {
+    {"400p",    YUVFMT_400P     },
+    {"420p",    YUVFMT_420P     },
+    {"420sp",   YUVFMT_420SP    },
+    {"420spa",  YUVFMT_420SPA   },
+    {"422p",    YUVFMT_422P     },
+    {"422sp",   YUVFMT_422SP    },
+    {"422spa",  YUVFMT_422SPA   },
+    {"uyvy",    YUVFMT_UYVY     },
+    {"yuyv",    YUVFMT_YUYV     },
+};
+
 static int fcall_layer = 0;
-#define ENTER_FUNC  printf("%-2d: %s +++\n", fcall_layer++, __FUNCTION__)
-#define LEAVE_FUNC  printf("%-2d: %s ---\n", --fcall_layer, __FUNCTION__)
+#define ENTER_FUNC  printf("@+++> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
+#define LEAVE_FUNC  printf("@---> %-2d: %s(-)\n", --fcall_layer, __FUNCTION__)
 
 inline int sat_div(int num, int den)
 {
@@ -222,7 +292,7 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     
     ENTER_FUNC;
     
-    assert (tile->b10     == rect->b10);
+    assert (tile->nlsb == rect->nlsb);
     assert (tile->w_align == rect->w_align);
     assert (tile->h_align == rect->h_align);
     
@@ -380,7 +450,7 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     
     ENTER_FUNC;
     
-    assert (tile->b10     == rect->b10);
+    assert (tile->nlsb == rect->nlsb);
     assert (tile->w_align == rect->w_align);
     assert (tile->h_align == rect->h_align);
     
@@ -554,7 +624,7 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
 
     ENTER_FUNC;
     
-    assert (rect10->b10     == rect16->b10);
+    assert (rect10->nlsb == rect16->nlsb);
     assert (rect10->w_align == rect16->w_align);
     assert (rect10->h_align == rect16->h_align);
     
@@ -821,7 +891,7 @@ int set_bufsz_aligned(yuv_seq_t *yuv)
 
     set_bufsz_aligned_b8(yuv, yuv->w_align, yuv->h_align, 0, 0);
     
-    if (yuv->b10) {
+    if (yuv->nlsb > 8) {
         yuv->y_stride   *= 2;
         yuv->y_size     *= 2;
         yuv->uv_stride  *= 2;
@@ -845,7 +915,7 @@ int set_bufsz_src_raster(yuv_seq_t *yuv)
     
     ENTER_FUNC;
 
-    if (yuv->b10) {
+    if (yuv->nlsb == 10) {
         bufw = bit_sat(2, bufw * 5 / 4);
     }
     
@@ -863,7 +933,7 @@ int set_bufsz_src_tile(yuv_seq_t *yuv)
     int tw      = 0;
     int th      = 0;
     int tsz     = 0; 
-    if (yuv->b10) { 
+    if (yuv->nlsb == 10) { 
         tw = 3; th = 4; tsz = 16; 
     } else { 
         tw = 8; th = 4; tsz = 32; 
@@ -895,7 +965,6 @@ int set_bufsz_src_tile(yuv_seq_t *yuv)
         yuv->uv_size    = sat_div(yuv->h_align / 2, th) * yuv->uv_stride; 
         yuv->io_size    = yuv->y_size + yuv->uv_size;
     }
-
     else if (fmt == YUVFMT_422P)  
     {
         yuv->uv_stride  = sat_div(yuv->w_align / 2, tw) * tsz;
@@ -918,7 +987,7 @@ int set_bufsz_src_tile(yuv_seq_t *yuv)
     return yuv->io_size;
 }
 
-void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int b10, int btile, int w_align_bit, int h_align_bit)
+void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, int w_align_bit, int h_align_bit)
 {
     ENTER_FUNC;
     
@@ -927,7 +996,7 @@ void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int b10, int btile, int
     yuv->w_align    = bit_sat( w_align_bit, yuv->width  );
     yuv->h_align    = bit_sat( h_align_bit, yuv->height );
     yuv->yuvfmt     = fmt;
-    yuv->b10        = b10;
+    yuv->nlsb   = nlsb;
     yuv->btile      = btile;
     
     set_bufsz_aligned(yuv);
@@ -943,7 +1012,7 @@ void show_yuv_info(yuv_seq_t *yuv)
     printf("w_align     = %d\n" , yuv->w_align   );
     printf("h_align     = %d\n" , yuv->h_align   );
     printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
-    printf("b10         = %d\n" , yuv->b10       );
+    printf("nlsb        = %d\n" , yuv->nlsb      );
     printf("btile       = %d\n" , yuv->btile     );
     printf("y_stride    = %d\n" , yuv->y_stride  );
     printf("uv_stride   = %d\n" , yuv->uv_stride );
@@ -958,86 +1027,97 @@ void show_yuv_info(yuv_seq_t *yuv)
     printf("\n");
 }
 
-int b16_rect_clip_10to8
+/**
+ *  @param [in] b08_stride byte stride
+ *  @param [in] b16_stride byte stride
+ *  @param [in] nlsb       valid bit is at MSB if nlsb < 0
+ */
+int b16_rect_2_b8
 (
-    uint8_t* src8, int src_stride, 
-    uint8_t* dst8, int dst_stride,
+    void* b16_base, int b16_stride, int nlsb,
+    void* b08_base, int b08_stride, int b_clip8,
     int w,  int h
 )
 {
     int x, y;
+    int nshift = (nlsb > 0) ? (nlsb - 8) : 8;
 
     for (y=0; y<h; ++y) 
     {
-        uint16_t* src = (uint16_t*)(src8 + y * src_stride);
-        uint8_t*  dst = (uint8_t* )(dst8 + y * dst_stride);
+        uint16_t* p16 = (uint16_t*)((uint8_t*)b16_base + y * b16_stride);
+        uint8_t*  p08 = (uint8_t* )((uint8_t*)b08_base + y * b08_stride);
         
-        for (x=0; x<w; ++x) 
-        {
-            //dst[x] = (uint8_t)(src[x] >> 2);
-            *(dst++) = (uint8_t)(*(src++) >> 2);
+        if (b_clip8 == B16_2_B8) {
+            for (x=0; x<w; ++x) {
+                *(p08 ++) = (uint8_t )(*(p16++) >> nshift);
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *(p16++) = (uint16_t)(*(p08 ++) << nshift);
+            }
         }
     }
     
     return w*h;
 }
 
-int b16_rect_clip_10to8_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
+int b16_rect_2_b8_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
 {
-    int fmt = psrc->yuvfmt;
+    int fmt = rect16->yuvfmt;
     
-    uint8_t* src8   = psrc->pbuf; 
-    uint8_t* dst8   = pdst->pbuf; 
-    int src_stride  = psrc->y_stride; 
-    int dst_stride  = pdst->y_stride;
-    int w   = psrc->w_align; 
-    int h   = psrc->h_align; 
+    uint8_t* b16_base   = rect16->pbuf; 
+    uint8_t* b08_base   = rect08->pbuf; 
+    int nlsb        = rect16->nlsb;
+    int b16_stride  = rect16->y_stride; 
+    int b08_stride  = rect08->y_stride;
+    int w   = rect16->w_align; 
+    int h   = rect16->h_align; 
 
     ENTER_FUNC;
     
-    assert (psrc->yuvfmt  == pdst->yuvfmt);
-    assert (psrc->w_align == pdst->w_align);
-    assert (psrc->h_align == pdst->h_align);
+    assert (rect16->yuvfmt  == rect08->yuvfmt);
+    assert (rect16->w_align == rect08->w_align);
+    assert (rect16->h_align == rect08->h_align);
     
     if      (fmt == YUVFMT_400P)
     {
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
         
-        src8       += psrc->y_size;
-        dst8       += pdst->y_size; 
-        src_stride  = psrc->uv_stride;
-        dst_stride  = pdst->uv_stride;
+        b16_base   += rect16->y_size;
+        b08_base   += rect08->y_size; 
+        b16_stride  = rect16->uv_stride;
+        b08_stride  = rect08->uv_stride;
         
         w   = w/2;
         h   = is_mch_422(fmt) ? h : h/2;
         
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
         
-        src8 += psrc->uv_size;
-        dst8 += pdst->uv_size;
+        b16_base   += rect16->uv_size;
+        b08_base   += rect08->uv_size;
         
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     else if (is_semi_planar(fmt))
     {
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
         
-        src8       += psrc->y_size;
-        dst8       += pdst->y_size; 
-        src_stride  = psrc->uv_stride;
-        dst_stride  = pdst->uv_stride;
+        b16_base   += rect16->y_size;
+        b08_base   += rect08->y_size; 
+        b16_stride  = rect16->uv_stride;
+        b08_stride  = rect08->uv_stride;
         h   = is_mch_422(fmt) ? h : h/2;
         
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
     {
         w   = w*2;
-        b16_rect_clip_10to8(src8, src_stride, dst8, dst_stride, w, h);
+        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     
     LEAVE_FUNC;
@@ -1230,7 +1310,7 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
     
     ENTER_FUNC;
 
-    assert (psrc->b10     == pdst->b10);
+    assert (psrc->nlsb == pdst->nlsb);
     assert (psrc->w_align == pdst->w_align);
     assert (psrc->h_align == pdst->h_align);
     assert (pdst->yuvfmt  == get_spl_fmt(fmt));
@@ -1248,163 +1328,488 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
     return 0;
 }
 
+static int arg_init (yuv_cfg_t *cfg, int argc, char *argv[]);
+static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[]);
+static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[]);
+static int arg_help()
+{
+    printf("-dst name          [-fmt ?] [-b10] [-btile]\n");
+    printf("-src name [-wxh ?] [-fmt ?] [-b10] [-btile]\n");
+    printf("          [-frame ?] [-stride ?] [-iosize ?]\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
-    int r;
-    if (argc<=7)
-    {
-        printf("prog [1]dst.yuv [2]src.yuv [3]w<int> [4]h<int> [5]start<int> [6]nfrm<int> \n");
-        printf("     [7]srcfmt<str>, [8]b10, [9]btile\n");
-        return -1;
-    } 
-
-    yuv_seq_t   seq_src;
-    yuv_seq_t   seq_b16;
-    yuv_seq_t   seq_dst;
-    yuv_seq_t   seq_spl;
-    memset(&seq_src, 0, sizeof(yuv_seq_t));
-    memset(&seq_b16, 0, sizeof(yuv_seq_t));
-    memset(&seq_dst, 0, sizeof(yuv_seq_t));
-    memset(&seq_spl, 0, sizeof(yuv_seq_t));
+    int         r, i;
+    yuv_cfg_t   cfg;
+    yuv_seq_t   seq[2];
+    yuv_seq_t   *psrc = &seq[0];
+    yuv_seq_t   *pdst = &seq[1];
+    #define SWAP_SRC_DST()  do { yuv_seq_t *ptmp=psrc; psrc=pdst; pdst=ptmp; } while(0)
     
-    seq_dst.fp = fopen(argv[1],"wb");
-    seq_src.fp = fopen(argv[2],"rb");
-    if( !seq_dst.fp || !seq_src.fp )
-    {
-        printf("error : open %s %s fail\n", seq_dst.fp?"":argv[1], seq_src.fp?"":argv[2]);
-        return -1;
+    memset(seq, 0, sizeof(seq));
+    memset(&cfg, 0, sizeof(cfg));
+    r = arg_parse(&cfg, argc, argv);
+    if (r < 0) {
+        arg_help();
+        return 1;
     }
-
-    int w       = atoi(argv[3]);
-    int h       = atoi(argv[4]);
-    int start   = atoi(argv[5]);
-    int nfrm    = atoi(argv[6]);
-    
-    printf("w=%d, h=%d, start=%d, nfrm=%d\n", w, h, start, nfrm);
-
-    int fmt     = YUVFMT_420P;
-    int b10     = 0;
-    int btile   = 0;
-    
-    if (argc>=8) {
-        if      ( !strcmp(argv[7], "420p" ) )  fmt = YUVFMT_420P;
-        else if ( !strcmp(argv[7], "420sp") )  fmt = YUVFMT_420SP;
-        else if ( !strcmp(argv[7], "422p" ) )  fmt = YUVFMT_422P;
-        else if ( !strcmp(argv[7], "422sp") )  fmt = YUVFMT_422SP;
-        else if ( !strcmp(argv[7], "uyvy" ) )  fmt = YUVFMT_UYVY;
-        else if ( !strcmp(argv[7], "yuyv" ) )  fmt = YUVFMT_YUYV;
-        else    { printf("error fmt\n");        return -1;  }
+    r = arg_check(&cfg, argc, argv);
+    if (r < 0) {
+        printf("\n****src****\n");  show_yuv_info(&cfg.src);
+        printf("\n****dst****\n");  show_yuv_info(&cfg.dst);
+        return 1;
     }
-    if (argc>=9)  { b10   = atoi(argv[8]); }
-    if (argc>=10) { btile = atoi(argv[9]); }
-
-    set_seq_info( &seq_src, w, h, fmt,  b10, btile, 3, 3);
-    set_seq_info( &seq_dst, w, h, fmt,  0,      0 , 3, 3);
     
-    if (btile)  set_bufsz_src_tile(&seq_src);
-    else        set_bufsz_src_raster(&seq_src);
-    
-    printf("\n seq_src:\n");       show_yuv_info(&seq_src);
-    printf("\n seq_dst:\n");       show_yuv_info(&seq_dst);
-
-    seq_src.pbuf = (uint8_t *)malloc(seq_src.buf_size);
-    seq_dst.pbuf = (uint8_t *)malloc(seq_dst.buf_size);
-    if(!seq_src.pbuf || !seq_dst.pbuf)
+    cfg.dst_fp = fopen(cfg.dst_path, "wb");
+    cfg.src_fp = fopen(cfg.src_path, "rb");
+    if( !cfg.dst_fp || !cfg.src_fp )
     {
-        printf("error: malloc %s %s fail\n", 
-                seq_src.pbuf ? (free(seq_src.pbuf), "") : "src.pbuf", 
-                seq_dst.pbuf ? (free(seq_dst.pbuf), "") : "dst.pbuf");
+        printf("error : open %s %s fail\n", 
+                cfg.dst_fp ? "" : argv[1], 
+                cfg.src_fp ? "" : argv[2]);
         return -1;
     }
 
-    if (b10) 
-    {  
-        set_seq_info( &seq_b16, w, h, fmt, 1, 0, 3, 3 );
-        printf("\n seq_b16:\n");    
-        show_yuv_info(&seq_b16);
-
-        seq_b16.pbuf = (uint8_t *)malloc(seq_b16.buf_size);
-        if(!seq_b16.pbuf)
-        {
-            printf("error: malloc %s fail\n", "seq_b16.pbuf");
+    seq[0].w_align = bit_sat(6, cfg.src.width);
+    seq[0].h_align = bit_sat(6, cfg.src.height);
+    seq[0].buf_size = seq[0].w_align * seq[0].h_align * 4 * 2;
+    for (i=0; i<2; ++i) {
+        seq[i].pbuf = (uint8_t *)malloc(seq[0].buf_size);
+        if(!seq[i].pbuf) {
+            printf("error: malloc seq[%d] fail\n", i);
             return -1;
         }
-    } 
-    //if (fmt != YUVFMT_420P && fmt != YUVFMT_422P ) 
-    {  
-        set_seq_info( &seq_spl, w, h, get_spl_fmt(fmt), 0, 0, 3, 3 );
-        printf("\n seq_spl:\n");        
-        show_yuv_info(&seq_spl);
+    }    
 
-        seq_spl.pbuf = (uint8_t *)malloc(seq_spl.buf_size);
-        if(!seq_spl.pbuf)
-        {
-            printf("error: malloc %s fail\n", "seq_spl.pbuf");
-            return -1;
-        }
-    }      
-
-    int i;
-    for (i=0; i<nfrm; i++) 
+    /*************************************************************************
+     *                          frame loop
+     ************************************************************************/
+    for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        int r=fseek(seq_src.fp, seq_src.io_size * i, SEEK_SET);
+        printf("\n@frm> **** %d ****\n", i);
+        
+        /**
+         *  read one frame
+         */
+        set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                cfg.src.yuvfmt, cfg.src.nlsb, cfg.src.btile, 0, 0);
+        
+        r=fseek(cfg.src_fp, pdst->io_size * i, SEEK_SET);
         if (r) {
-            printf("fseek %d error\n", seq_src.io_size * i);
+            printf("fseek %d error\n", pdst->io_size * i);
             return -1;
         }
-        r = fread(seq_src.pbuf, seq_src.io_size, 1, seq_src.fp);
+        r = fread(pdst->pbuf, pdst->io_size, 1, cfg.src_fp);
         if (r<1) {
-            if ( feof(seq_src.fp) ) {
+            if ( feof(cfg.src_fp) ) {
                 printf("reach file end, force stop\n");
             } else {
                 printf("error reading file\n");
             }
             break;
         }
+        
+        /**
+         *  b10-untile/unpack, b8-untile
+         */
+        if (cfg.src.nlsb==10) 
+        {
+            SWAP_SRC_DST();
+            set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                    cfg.src.yuvfmt, BIT_10, TILE_0, 4, 4);
+            if (cfg.src.btile) {
+                b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
+            } else {
+                b10_rect_unpack_mch(psrc, pdst, B10_2_B16);
+            }
+        } 
+        else
+        {
+            if (cfg.src.btile) {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.src.yuvfmt, BIT_8, TILE_0, 4, 4);
+                b8_tile_2_rect_mch(psrc, pdst);
+            }
+        }
 
-        if (b10) {
-            if (btile) {
-                b10_tile_unpack_mch(&seq_src, &seq_b16, 0);
-            } else {
-                b10_rect_unpack_mch(&seq_src, &seq_b16, 0);
+        /**
+         *  bit-shift
+         */
+        if (cfg.src.nlsb != cfg.dst.nlsb) {
+            if (cfg.src.nlsb==10 && cfg.dst.nlsb==8) {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.src.yuvfmt, BIT_8, TILE_0, 4, 4);
+                b16_rect_2_b8_mch(psrc, pdst, B16_2_B8);
+            } 
+            else if (cfg.src.nlsb==8 && cfg.dst.nlsb==10) {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.src.yuvfmt, BIT_10, TILE_0, 4, 4);
+                b16_rect_2_b8_mch(pdst, psrc, B8_2_B16);
+            }
+        }
+
+        /**
+         *  fmt convertion
+         */        
+        if (cfg.src.yuvfmt != cfg.dst.yuvfmt) 
+        {
+            // uv de-interlace
+            if (cfg.src.yuvfmt != get_spl_fmt(cfg.src.yuvfmt)) { 
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        get_spl_fmt(cfg.src.yuvfmt), BIT_8, TILE_0, 0, 0);
+                if (is_semi_planar(cfg.src.yuvfmt)) {
+                    b8mch_sp2p(psrc, pdst, ITL_2_SPL);
+                } else if (cfg.src.yuvfmt == YUVFMT_UYVY || cfg.src.yuvfmt == YUVFMT_YUYV) {
+                    b8mch_yuyv2p(psrc, pdst, ITL_2_SPL);
+                }
             }
             
-/*
-            seq_b16.fp = fopen("seq_b16.yuv","wb");
-            r = fwrite(seq_b16.pbuf, seq_b16.io_size, 1, seq_b16.fp);
-            if (r<1) {
-                printf("error writing file\n");
-                break;
+            // uv re-sample
+            if (get_spl_fmt(cfg.src.yuvfmt) != get_spl_fmt(cfg.dst.yuvfmt))
+            {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        get_spl_fmt(cfg.dst.yuvfmt), BIT_8, TILE_0, 0, 0);
+                b8mch_p2p(psrc, pdst); 
             }
-            fclose(seq_b16.fp);
-*/
-            
-            b16_rect_clip_10to8_mch(&seq_b16, &seq_dst);
-            b8mch_spliting(&seq_dst, &seq_spl);
-        } else {
-            if (btile) {
-                b8_tile_2_rect_mch(&seq_src, &seq_dst);
-                b8mch_spliting(&seq_dst, &seq_spl);
+
+            // uv interlace
+            if (cfg.dst.yuvfmt != get_spl_fmt(cfg.dst.yuvfmt)) {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.dst.yuvfmt, BIT_8, TILE_0, 0, 0);
+                if (is_semi_planar(cfg.dst.yuvfmt)) {
+                    b8mch_sp2p(pdst, psrc, SPL_2_ITL);
+                } else if (cfg.dst.yuvfmt == YUVFMT_UYVY  || cfg.dst.yuvfmt == YUVFMT_YUYV ) {
+                    b8mch_yuyv2p(pdst, psrc, SPL_2_ITL);
+                }
+            }
+        }
+
+        /**
+         *  b10-tile/pack, b8-tile
+         */
+        if (cfg.dst.nlsb==10) 
+        {
+            SWAP_SRC_DST();
+            if (cfg.dst.btile) {
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.dst.yuvfmt, BIT_10, TILE_1, 4, 4);
+                b10_tile_unpack_mch(psrc, pdst, B16_2_B10);
             } else {
-                b8mch_spliting(&seq_src, &seq_spl);
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.dst.yuvfmt, BIT_10, TILE_0, 4, 4);
+                b10_rect_unpack_mch(psrc, pdst, B16_2_B10);
+            }
+        }
+        else
+        {
+            if (cfg.dst.btile) {
+                SWAP_SRC_DST();
+                set_seq_info(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.dst.yuvfmt, BIT_8, TILE_1, 4, 4);
+                b8_rect_2_tile_mch(psrc, pdst);
             }
         }
         
-        r = fwrite(seq_spl.pbuf, seq_spl.io_size, 1, seq_dst.fp);
+        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst_fp);
       
         if (r<1) {
             printf("error writing file\n");
             break;
         }
+    } // end frame loop
+    
+    for (i=0; i<2; ++i) {
+        if (seq[i].pbuf)    free(seq[i].pbuf);
+    }
+    
+    if (cfg.dst_fp)     fclose(cfg.dst_fp);
+    if (cfg.src_fp)     fclose(cfg.src_fp);
+
+    return 0;
+}
+
+#define GET_ARGV(idx, name) get_argv(argc, argv, idx, name)
+static char *get_argv(int argc, char *argv[], int i, char *name)
+{
+    int s = i<argc ? argv[i][0] : 0;
+    char *arg = (s != 0 && s != '-') ? argv[i] : 0;
+    if (name) {
+        printf("@cmdl>> get_argv[%s]=%s\n", name, arg?arg:"");
+    }
+    return arg;
+}
+
+static char* get_uint32 (char *str, uint32_t *out)
+{
+    char  *curr = str;
+    
+    if ( curr ) {
+        int  c, sum;
+        for (sum=0, curr=str; (c = *curr) && c >= '0' && c <= '9'; ++ curr) {
+            sum = sum * 10 + ( c - '0' );
+        }
+        if (out) { *out = sum; }
     }
 
-    if(seq_src.pbuf)    free(seq_src.pbuf);
-    if(seq_b16.pbuf)    free(seq_b16.pbuf);
-    if(seq_dst.pbuf)    free(seq_dst.pbuf);
-    if(seq_spl.pbuf)    free(seq_spl.pbuf);
-    
-    if(seq_src.fp)      fclose(seq_src.fp);
-    if(seq_dst.fp)      fclose(seq_dst.fp);
+    return curr;
+}
 
+static int arg_parse_wxh(int i, int argc, char *argv[], yuv_seq_t *seq)
+{
+    int j;
+    char *flag=0;
+    char *last=0;
+    
+    char *arg = GET_ARGV(++ i, "wxh");
+    if (!arg) {
+        return -1;
+    }
+    
+    for (j=0; j<ARRAY_SIZE(cmn_res); ++j) {
+        if (0==strcmp(arg, cmn_res[j].name)) {
+            seq->width  = cmn_res[j].w;  
+            seq->height = cmn_res[j].h;
+            return ++i;
+        }
+    }
+    
+    //seq->width = strtoul (arg, &flag, 10);
+    flag = get_uint32 (arg, &seq->width);
+    if (flag==0 || *flag != 'x') {
+        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        return -1;
+    }
+    
+    //seq->height = strtoul (flag + 1, &last, 10);
+    last = get_uint32 (flag + 1, &seq->height);
+    if (last == 0 || *last != 0 ) {
+        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        return -1;
+    }
+
+    return -1;
+}
+
+static int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
+{
+    int j;
+    
+    char *arg = GET_ARGV(++ i, "yuvfmt");
+    if (!arg) {
+        return -1;
+    }
+    
+    for (j=0; j<ARRAY_SIZE(cmn_fmt); ++j) {
+        if (0==strcmp(arg, cmn_fmt[j].name)) {
+            *fmt = cmn_fmt[j].ifmt;
+            return ++i;
+        }
+    }
+    
+    printf("@cmdl>> Err : unrecognized yuvfmt `%s`\n", arg);
+    return -1;
+}
+
+static int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
+{
+    char *flag=0;
+    char *last=0;
+    char *arg = GET_ARGV(++i, "range");
+    if (!arg) {
+        return -1;
+    }
+    
+    i_range[0] = 0;
+    i_range[1] = INT_MAX;
+    
+    /* parse argv : `$base[~$last]` or `$base[+$count]` */
+    //i_range[0] = strtoul (arg, &flag, 10);
+    flag = get_uint32 (arg, &i_range[0]);
+    if (flag==0 || *flag == 0) {       /* no `~$last` or `+$count` */
+        return ++i;
+    }
+
+    /* get `~$last` or `+$count` */
+    if (*flag != '~' && *flag != '+') {
+        printf("@cmdl>> Err : Invalid flag\n");
+        return -1;
+    }
+    
+    //i_range[1] = strtoul (flag + 1, &last, 10);
+    last = get_uint32 (flag + 1, &i_range[1]);
+    if (last == 0 || *last != 0 ) {
+        printf("@cmdl>> Err : Invalid count/end\n");
+        i_range[1] = INT_MAX;
+        return -1;
+    }
+    
+    if (*flag == '+') {
+        i_range[1] += i_range[0];
+    }
+    
+    return ++i;
+}
+
+static int arg_parse_str(int i, int argc, char *argv[], char **p)
+{
+    char *arg = GET_ARGV(++ i, "string");
+    *p = arg ? arg : 0;
+    return arg ? ++i : -1;
+}
+
+static int arg_parse_int(int i, int argc, char *argv[], int *p)
+{
+    char *arg = GET_ARGV(++ i, "int");
+    *p = arg ? atoi(arg) : (-1);
+    return arg ? ++i : -1;
+}
+
+static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
+{
+    int i, j;
+    yuv_seq_t *seq = &cfg->dst;
+    
+    ENTER_FUNC;
+    
+    if (argc<2) {
+        return -1;
+    }
+    if (0 != strcmp(argv[1], "-dst") && 0 != strcmp(argv[1], "-src") &&
+        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") )
+    {
+        return -1;
+    }
+    
+    /**
+     *  init options
+     */
+    set_seq_info(&cfg->src, 0, 0, YUVFMT_420P, BIT_8, TILE_0, 0, 0);
+    set_seq_info(&cfg->dst, 0, 0, YUVFMT_420P, BIT_8, TILE_0, 0, 0);
+    cfg->frame_range[1] = INT_MAX;
+
+    /**
+     *  loop options
+     */    
+    for (i=1; i>=0 && i<argc; )
+    {
+        char *arg = argv[i];
+        if (arg[0]!='-') {
+            printf("@cmdl>> Err : unrecognized arg `%s`\n", arg);
+            return -i;
+        }
+        arg += 1;
+        
+        for (j=0; j<ARRAY_SIZE(cmn_res); ++j) {
+            if (0==strcmp(arg, cmn_res[j].name)) {
+                seq->width  = cmn_res[j].w;
+                seq->height = cmn_res[j].h;
+                break;
+            }
+        }
+        if (j<ARRAY_SIZE(cmn_res)) {
+            ++i; continue;
+        }
+        
+        for (j=0; j<ARRAY_SIZE(cmn_fmt); ++j) {
+            if (0==strcmp(arg, cmn_fmt[j].name)) {
+                seq->yuvfmt = cmn_fmt[j].ifmt;
+                break;
+            }
+        }
+        if (j<ARRAY_SIZE(cmn_fmt)) {
+            ++i; continue;
+        }
+        
+        if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
+            arg_help();
+            return -1;
+        } else
+        if (0==strcmp(arg, "src")) {
+            seq = &cfg->src;
+            i = arg_parse_str(i, argc, argv, &cfg->src_path);
+        } else
+        if (0==strcmp(arg, "dst")) {
+            seq = &cfg->dst;
+            i = arg_parse_str(i, argc, argv, &cfg->dst_path);
+        } else
+        if (0==strcmp(arg, "wxh")) {
+            i = arg_parse_wxh(i, argc, argv, seq);
+        } else
+        if (0==strcmp(arg, "fmt")) {
+            i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
+        } else
+        if (0==strcmp(arg, "b10")) {
+            ++i;    seq->nlsb = 10;
+        } else
+        if (0==strcmp(arg, "btile")) {
+            ++i;    seq->btile = 1;
+        } else  
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
+            int nframe = 0;
+            i = arg_parse_int(i, argc, argv, &nframe);
+            cfg->frame_range[1] = nframe + cfg->frame_range[0];
+        } else
+        if (0==strcmp(arg, "f-start")) {
+            i = arg_parse_int(i, argc, argv, &cfg->frame_range[0]);
+        } else
+        if (0==strcmp(arg, "f-range") || 0==strcmp(arg, "f")) {
+            i = arg_parse_range(i, argc, argv, cfg->frame_range);
+        } else
+        if (0==strcmp(arg, "stride")) {
+            i = arg_parse_int(i, argc, argv, &seq->y_stride);
+        } else
+        if (0==strcmp(arg, "iosize")) {
+            i = arg_parse_int(i, argc, argv, &seq->io_size);
+        } else
+        {
+            printf("@cmdl>> Err : invalid opt `%s`\n", arg);
+            return -i;
+        }
+    }
+    
+    LEAVE_FUNC;
+
+    return i;
+}
+
+static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
+{
+    yuv_seq_t *psrc = &cfg->src;
+    yuv_seq_t *pdst = &cfg->dst;
+    
+    ENTER_FUNC;
+    
+    if (!cfg->src_path || !cfg->dst_path) {
+        printf("@cmdl>> Err : no src or dst\n");
+        return -1;
+    }
+    if (cfg->frame_range[0] >= cfg->frame_range[1]) {
+        printf("@cmdl>> Err : Invalid frame_range %d~%d\n", 
+                cfg->frame_range[0], cfg->frame_range[1]);
+        return -1;
+    }
+    if (!psrc->width || !psrc->height) {
+        printf("@cmdl>> Err : invalid resolution for src\n");
+        return -1;
+    }
+    if (psrc->nlsb != 8 && psrc->nlsb!=10) {
+        printf("@cmdl>> Err : invalid nlsb (%d) for src\n", psrc->nlsb);
+        return -1;
+    }
+    if (pdst->nlsb != 8 && pdst->nlsb!=10) {
+        printf("@cmdl>> Err : invalid nlsb (%d) for dst\n", pdst->nlsb);
+        return -1;
+    }
+    
+    LEAVE_FUNC;
+    
     return 0;
 }
