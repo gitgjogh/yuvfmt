@@ -190,6 +190,319 @@ int get_uv_height(yuv_seq_t *yuv)
     return 0;
 }
 
+/** 
+ *  422p <-> 420p uv down/up sampling
+ */
+int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+{
+    int src_fmt = psrc->yuvfmt;
+    int dst_fmt = pdst->yuvfmt;
+
+    uint8_t* src_y_base = psrc->pbuf;                   uint8_t* src_y = src_y_base;
+    uint8_t* src_u_base = src_y_base + psrc->y_size;    uint8_t* src_u = src_u_base;
+    uint8_t* src_v_base = src_u_base + psrc->uv_size;   uint8_t* src_v = src_v_base;
+    
+    uint8_t* dst_y_base = pdst->pbuf;                   uint8_t* dst_y = dst_y_base;
+    uint8_t* dst_u_base = dst_y_base + pdst->y_size;    uint8_t* dst_u = dst_u_base;
+    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;   uint8_t* dst_v = dst_v_base;
+
+    int src_uv_shift = is_mch_420(src_fmt) ? 0 : psrc->uv_stride;
+    int dst_uv_shift = is_mch_420(dst_fmt) ? 0 : pdst->uv_stride;
+    
+    int w   = psrc->width; 
+    int h   = psrc->height; 
+    int y;
+
+    ENTER_FUNC;
+    
+    for (y=0; y<h; ++y) {
+        memcpy(dst_y, src_y, w);
+        dst_y += pdst->y_stride;
+        src_y += psrc->y_stride;
+    }
+    
+    if (src_fmt==YUVFMT_400P || dst_fmt==YUVFMT_400P)
+        return 0;
+    
+    w   = w/2;
+    h   = h/2;
+    
+    for (y=0; y<h; ++y) 
+    {
+        dst_u += pdst->uv_stride + dst_uv_shift;
+        src_u += psrc->uv_stride + src_uv_shift;
+        dst_v += pdst->uv_stride + dst_uv_shift;
+        src_v += psrc->uv_stride + src_uv_shift;
+        
+        memcpy(dst_u, src_u, w);
+        memcpy(dst_v, src_v, w);
+        
+        if (dst_uv_shift>0) 
+        {
+            memcpy(dst_u + dst_uv_shift, src_u + src_uv_shift, w);
+            memcpy(dst_v + dst_uv_shift, src_v + src_uv_shift, w);
+        }
+    }
+    
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+/**
+ *  @itl : uv is interlaced (here 420sp)
+ *  @spl : uv is splitted
+ */
+int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
+{
+    int fmt = itl->yuvfmt;
+    
+    uint8_t* itl_y_base = itl->pbuf;
+    uint8_t* itl_u_base = itl_y_base + itl->y_size;
+    
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
+    
+    int w   = itl->width; 
+    int h   = itl->height; 
+    int x, y;
+
+    ENTER_FUNC;
+    
+    for (y=0; y<h; ++y) {
+        uint8_t* itl_y = itl_y_base + y * itl->y_stride;
+        uint8_t* spl_y = spl_y_base + y * spl->y_stride;
+        memcpy(spl_y, itl_y, w);
+    }
+
+    w   = w/2;
+    h   = is_mch_422(fmt) ? h : h/2;
+    
+    for (y=0; y<h; ++y) {
+        uint8_t* itl_u = itl_u_base + y * itl->uv_stride;
+        uint8_t* spl_u = spl_u_base + y * spl->uv_stride;
+        uint8_t* spl_v = spl_v_base + y * spl->uv_stride;
+
+        if (b_interlacing == INTERLACING) {
+            for (x=0; x<w; ++x) {
+                *(itl_u++) = *(spl_u++);
+                *(itl_u++) = *(spl_v++);
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *(spl_u++) = *(itl_u++);
+                *(spl_v++) = *(itl_u++);
+            }
+        }
+    }
+    
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+/**
+ *  @itl : luma & chroma is interlaced (here uyvy or yuyv)
+ *  @spl : luma & chroma is splitted
+ */
+int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
+{
+    uint8_t* itl_y_base = itl->pbuf;
+    
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
+
+    int w   = itl->width; 
+    int h   = itl->height; 
+    int x, y;
+
+    ENTER_FUNC;
+
+    w   = w/2;
+
+    for (y=0; y<h; ++y) 
+    {
+        uint8_t* itl_y  = itl_y_base + y * itl->y_stride;
+        uint8_t* spl_y  = spl_y_base + y * spl->y_stride;
+        uint8_t* spl_u  = spl_u_base + y * spl->uv_stride;
+        uint8_t* spl_v  = spl_v_base + y * spl->uv_stride;
+
+        if (b_interlacing == INTERLACING) {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
+                    *(itl_y++) = *(spl_y++);
+                }
+            }
+        } else {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                }
+            }
+        }
+    }   /* end for y*/
+
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
+{
+    #define TR_BUF_SIZE 4094
+    static uint8_t tr_buf[TR_BUF_SIZE];
+    uint16_t *tr_base = (uint16_t*)tr_buf;
+    int size_needed = dstw * dsth * sizeof(uint16_t);
+    if (size_needed>TR_BUF_SIZE)
+    {
+        tr_base = (uint16_t*) malloc ( size_needed );
+        if (tr_base==0) {
+            printf("%s : malloc fail!\n", __FUNCTION__);
+            return 0;
+        }
+    }
+    memcpy(tr_base, rect_base, size_needed);
+
+    int x, y;
+    uint16_t* p16_base = (uint16_t*)rect_base;
+    static uint16_t m;
+    for(y=0; y<dsth; ++y)
+    {
+        for(x=0; x<dstw; ++x)
+        {
+            p16_base[y*dstw+x] = tr_base[x*dsth+y];
+        }
+    }
+    
+    if (size_needed>TR_BUF_SIZE)
+    {
+        free(tr_base);
+    }
+}
+
+/** bitdepth conversion
+ *  @param [in] b08_stride byte stride
+ *  @param [in] b16_stride byte stride
+ *  @param [in] nlsb       valid bit is at MSB if nlsb < 0
+ */
+int b16_n_b8_cvt
+(
+    void* b16_base, int b16_stride, int nlsb,
+    void* b08_base, int b08_stride, int b_clip8,
+    int w,  int h
+)
+{
+    int x, y;
+    int nshift = (nlsb > 0) ? (nlsb - 8) : 8;
+
+    for (y=0; y<h; ++y) 
+    {
+        uint16_t* p16 = (uint16_t*)((uint8_t*)b16_base + y * b16_stride);
+        uint8_t*  p08 = (uint8_t* )((uint8_t*)b08_base + y * b08_stride);
+        
+        if (b_clip8 == B16_2_B8) {
+            for (x=0; x<w; ++x) {
+                *(p08 ++) = (uint8_t )(*(p16++) >> nshift);
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *(p16++) = (uint16_t)(*(p08 ++) << nshift);
+            }
+        }
+    }
+    
+    return w*h;
+}
+
+int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
+{
+    int fmt = rect16->yuvfmt;
+    
+    uint8_t* b16_base   = rect16->pbuf; 
+    uint8_t* b08_base   = rect08->pbuf; 
+    int nlsb        = rect16->nlsb;
+    int b16_stride  = rect16->y_stride; 
+    int b08_stride  = rect08->y_stride;
+    int w   = rect16->width; 
+    int h   = rect16->height; 
+
+    ENTER_FUNC;
+    
+    assert (rect16->nbit  == 16);
+    assert (rect16->nlsb  >= 8);
+    assert (rect08->nbit  == 8);
+    assert (rect16->yuvfmt  == rect08->yuvfmt);
+    assert (rect16->width   == rect08->width);
+    assert (rect16->height  == rect08->height);
+    
+    if      (fmt == YUVFMT_400P)
+    {
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    {
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+        
+        b16_base   += rect16->y_size;
+        b08_base   += rect08->y_size; 
+        b16_stride  = rect16->uv_stride;
+        b08_stride  = rect08->uv_stride;
+        
+        w   = w/2;
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+        
+        b16_base   += rect16->uv_size;
+        b08_base   += rect08->uv_size;
+        
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+    }
+    else if (is_semi_planar(fmt))
+    {
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+        
+        b16_base   += rect16->y_size;
+        b08_base   += rect08->y_size; 
+        b16_stride  = rect16->uv_stride;
+        b08_stride  = rect08->uv_stride;
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+    }
+    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
+    {
+        w   = w*2;
+        b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
+    }
+    
+    LEAVE_FUNC;
+
+    return 0;
+}
+
 void b8_linear_2_rect_align_0(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
@@ -580,39 +893,6 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
     return;
 }
 
-int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
-{
-    #define TR_BUF_SIZE 4094
-    static uint8_t tr_buf[TR_BUF_SIZE];
-    uint16_t *tr_base = (uint16_t*)tr_buf;
-    int size_needed = dstw * dsth * sizeof(uint16_t);
-    if (size_needed>TR_BUF_SIZE)
-    {
-        tr_base = (uint16_t*) malloc ( size_needed );
-        if (tr_base==0) {
-            printf("%s : malloc fail!\n", __FUNCTION__);
-            return 0;
-        }
-    }
-    memcpy(tr_base, rect_base, size_needed);
-
-    int x, y;
-    uint16_t* p16_base = (uint16_t*)rect_base;
-    static uint16_t m;
-    for(y=0; y<dsth; ++y)
-    {
-        for(x=0; x<dstw; ++x)
-        {
-            p16_base[y*dstw+x] = tr_base[x*dsth+y];
-        }
-    }
-    
-    if (size_needed>TR_BUF_SIZE)
-    {
-        free(tr_base);
-    }
-}
-
 int b10_tile_unpack
 (
     int      b_pack,
@@ -834,286 +1114,6 @@ void show_yuv_info(yuv_seq_t *yuv)
     printf("\n");
 }
 
-/**
- *  @param [in] b08_stride byte stride
- *  @param [in] b16_stride byte stride
- *  @param [in] nlsb       valid bit is at MSB if nlsb < 0
- */
-int b16_rect_2_b8
-(
-    void* b16_base, int b16_stride, int nlsb,
-    void* b08_base, int b08_stride, int b_clip8,
-    int w,  int h
-)
-{
-    int x, y;
-    int nshift = (nlsb > 0) ? (nlsb - 8) : 8;
-
-    for (y=0; y<h; ++y) 
-    {
-        uint16_t* p16 = (uint16_t*)((uint8_t*)b16_base + y * b16_stride);
-        uint8_t*  p08 = (uint8_t* )((uint8_t*)b08_base + y * b08_stride);
-        
-        if (b_clip8 == B16_2_B8) {
-            for (x=0; x<w; ++x) {
-                *(p08 ++) = (uint8_t )(*(p16++) >> nshift);
-            }
-        } else {
-            for (x=0; x<w; ++x) {
-                *(p16++) = (uint16_t)(*(p08 ++) << nshift);
-            }
-        }
-    }
-    
-    return w*h;
-}
-
-int b16_rect_2_b8_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
-{
-    int fmt = rect16->yuvfmt;
-    
-    uint8_t* b16_base   = rect16->pbuf; 
-    uint8_t* b08_base   = rect08->pbuf; 
-    int nlsb        = rect16->nlsb;
-    int b16_stride  = rect16->y_stride; 
-    int b08_stride  = rect08->y_stride;
-    int w   = rect16->width; 
-    int h   = rect16->height; 
-
-    ENTER_FUNC;
-    
-    assert (rect16->nbit  == 16);
-    assert (rect16->nlsb  >= 8);
-    assert (rect08->nbit  == 8);
-    assert (rect16->yuvfmt  == rect08->yuvfmt);
-    assert (rect16->width   == rect08->width);
-    assert (rect16->height  == rect08->height);
-    
-    if      (fmt == YUVFMT_400P)
-    {
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-    }
-    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
-    {
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-        
-        b16_base   += rect16->y_size;
-        b08_base   += rect08->y_size; 
-        b16_stride  = rect16->uv_stride;
-        b08_stride  = rect08->uv_stride;
-        
-        w   = w/2;
-        h   = is_mch_422(fmt) ? h : h/2;
-        
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-        
-        b16_base   += rect16->uv_size;
-        b08_base   += rect08->uv_size;
-        
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-    }
-    else if (is_semi_planar(fmt))
-    {
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-        
-        b16_base   += rect16->y_size;
-        b08_base   += rect08->y_size; 
-        b16_stride  = rect16->uv_stride;
-        b08_stride  = rect08->uv_stride;
-        h   = is_mch_422(fmt) ? h : h/2;
-        
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-    }
-    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        w   = w*2;
-        b16_rect_2_b8(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
-    }
-    
-    LEAVE_FUNC;
-
-    return 0;
-}
-
-/**
- *  support 422p <-> 420p uv down/up sampling
- */
-int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
-{
-    int src_fmt = psrc->yuvfmt;
-    int dst_fmt = pdst->yuvfmt;
-
-    uint8_t* src_y_base = psrc->pbuf;                   uint8_t* src_y = src_y_base;
-    uint8_t* src_u_base = src_y_base + psrc->y_size;    uint8_t* src_u = src_u_base;
-    uint8_t* src_v_base = src_u_base + psrc->uv_size;   uint8_t* src_v = src_v_base;
-    
-    uint8_t* dst_y_base = pdst->pbuf;                   uint8_t* dst_y = dst_y_base;
-    uint8_t* dst_u_base = dst_y_base + pdst->y_size;    uint8_t* dst_u = dst_u_base;
-    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;   uint8_t* dst_v = dst_v_base;
-
-    int src_uv_shift = is_mch_420(src_fmt) ? 0 : psrc->uv_stride;
-    int dst_uv_shift = is_mch_420(dst_fmt) ? 0 : pdst->uv_stride;
-    
-    int w   = psrc->width; 
-    int h   = psrc->height; 
-    int y;
-
-    ENTER_FUNC;
-    
-    for (y=0; y<h; ++y) {
-        memcpy(dst_y, src_y, w);
-        dst_y += pdst->y_stride;
-        src_y += psrc->y_stride;
-    }
-    
-    if (src_fmt==YUVFMT_400P || dst_fmt==YUVFMT_400P)
-        return 0;
-    
-    w   = w/2;
-    h   = h/2;
-    
-    for (y=0; y<h; ++y) 
-    {
-        dst_u += pdst->uv_stride + dst_uv_shift;
-        src_u += psrc->uv_stride + src_uv_shift;
-        dst_v += pdst->uv_stride + dst_uv_shift;
-        src_v += psrc->uv_stride + src_uv_shift;
-        
-        memcpy(dst_u, src_u, w);
-        memcpy(dst_v, src_v, w);
-        
-        if (dst_uv_shift>0) 
-        {
-            memcpy(dst_u + dst_uv_shift, src_u + src_uv_shift, w);
-            memcpy(dst_v + dst_uv_shift, src_v + src_uv_shift, w);
-        }
-    }
-    
-    LEAVE_FUNC;
-    
-    return 0;
-}
-
-/**
- *  @itl : uv is interlaced (here 420sp)
- *  @spl : uv is splitted
- */
-int b8mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
-{
-    int fmt = itl->yuvfmt;
-    
-    uint8_t* itl_y_base = itl->pbuf;
-    uint8_t* itl_u_base = itl_y_base + itl->y_size;
-    
-    uint8_t* spl_y_base = spl->pbuf;
-    uint8_t* spl_u_base = spl_y_base + spl->y_size;
-    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
-    
-    int w   = itl->width; 
-    int h   = itl->height; 
-    int x, y;
-
-    ENTER_FUNC;
-    
-    for (y=0; y<h; ++y) {
-        uint8_t* itl_y = itl_y_base + y * itl->y_stride;
-        uint8_t* spl_y = spl_y_base + y * spl->y_stride;
-        memcpy(spl_y, itl_y, w);
-    }
-
-    w   = w/2;
-    h   = is_mch_422(fmt) ? h : h/2;
-    
-    for (y=0; y<h; ++y) {
-        uint8_t* itl_u = itl_u_base + y * itl->uv_stride;
-        uint8_t* spl_u = spl_u_base + y * spl->uv_stride;
-        uint8_t* spl_v = spl_v_base + y * spl->uv_stride;
-
-        if (b_interlacing == INTERLACING) {
-            for (x=0; x<w; ++x) {
-                *(itl_u++) = *(spl_u++);
-                *(itl_u++) = *(spl_v++);
-            }
-        } else {
-            for (x=0; x<w; ++x) {
-                *(spl_u++) = *(itl_u++);
-                *(spl_v++) = *(itl_u++);
-            }
-        }
-    }
-    
-    LEAVE_FUNC;
-    
-    return 0;
-}
-
-/**
- *  @itl : luma & chroma is interlaced (here uyvy or yuyv)
- *  @spl : luma & chroma is splitted
- */
-int b8mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
-{
-    uint8_t* itl_y_base = itl->pbuf;
-    
-    uint8_t* spl_y_base = spl->pbuf;
-    uint8_t* spl_u_base = spl_y_base + spl->y_size;
-    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
-
-    int w   = itl->width; 
-    int h   = itl->height; 
-    int x, y;
-
-    ENTER_FUNC;
-
-    w   = w/2;
-
-    for (y=0; y<h; ++y) 
-    {
-        uint8_t* itl_y  = itl_y_base + y * itl->y_stride;
-        uint8_t* spl_y  = spl_y_base + y * spl->y_stride;
-        uint8_t* spl_u  = spl_u_base + y * spl->uv_stride;
-        uint8_t* spl_v  = spl_v_base + y * spl->uv_stride;
-
-        if (b_interlacing == INTERLACING) {
-            if (itl->yuvfmt == YUVFMT_YUYV) {
-                for (x=0; x<w; ++x) {
-                    *(itl_y++) = *(spl_y++);
-                    *(itl_y++) = *(spl_u++);
-                    *(itl_y++) = *(spl_y++);
-                    *(itl_y++) = *(spl_v++);
-                }
-            } else {
-                for (x=0; x<w; ++x) {
-                    *(itl_y++) = *(spl_u++);
-                    *(itl_y++) = *(spl_y++);
-                    *(itl_y++) = *(spl_v++);
-                    *(itl_y++) = *(spl_y++);
-                }
-            }
-        } else {
-            if (itl->yuvfmt == YUVFMT_YUYV) {
-                for (x=0; x<w; ++x) {
-                    *(spl_y++) = *(itl_y++);
-                    *(spl_u++) = *(itl_y++);
-                    *(spl_y++) = *(itl_y++);
-                    *(spl_v++) = *(itl_y++);
-                }
-            } else {
-                for (x=0; x<w; ++x) {
-                    *(spl_u++) = *(itl_y++);
-                    *(spl_y++) = *(itl_y++);
-                    *(spl_v++) = *(itl_y++);
-                    *(spl_y++) = *(itl_y++);
-                }
-            }
-        }
-    }   /* end for y*/
-
-    LEAVE_FUNC;
-    
-    return 0;
-}
-
 static int arg_init (yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[]);
@@ -1238,14 +1238,14 @@ int main(int argc, char **argv)
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
-                b16_rect_2_b8_mch(psrc, pdst, B16_2_B8);
+                b16_n_b8_cvt_mch(psrc, pdst, B16_2_B8);
             } 
             else if (pdst->nbit==8 && cfg.dst.nbit>8) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.src.yuvfmt, BIT_16, TILE_0, 0, 0);
                 pdst->nlsb = cfg.dst.nlsb;
-                b16_rect_2_b8_mch(pdst, psrc, B8_2_B16);
+                b16_n_b8_cvt_mch(pdst, psrc, B8_2_B16);
             }
         }
 
@@ -1260,9 +1260,9 @@ int main(int argc, char **argv)
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         get_spl_fmt(cfg.src.yuvfmt), BIT_8, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.src.yuvfmt)) {
-                    b8mch_sp2p(psrc, pdst, SPLITTING);
+                    b8_mch_sp2p(psrc, pdst, SPLITTING);
                 } else if (cfg.src.yuvfmt == YUVFMT_UYVY || cfg.src.yuvfmt == YUVFMT_YUYV) {
-                    b8mch_yuyv2p(psrc, pdst, SPLITTING);
+                    b8_mch_yuyv2p(psrc, pdst, SPLITTING);
                 }
             }
             
@@ -1272,7 +1272,7 @@ int main(int argc, char **argv)
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         get_spl_fmt(cfg.dst.yuvfmt), BIT_8, TILE_0, 0, 0);
-                b8mch_p2p(psrc, pdst); 
+                b8_mch_p2p(psrc, pdst); 
             }
 
             // uv interlace
@@ -1281,9 +1281,9 @@ int main(int argc, char **argv)
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.dst.yuvfmt, BIT_8, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.dst.yuvfmt)) {
-                    b8mch_sp2p(pdst, psrc, INTERLACING);
+                    b8_mch_sp2p(pdst, psrc, INTERLACING);
                 } else if (cfg.dst.yuvfmt == YUVFMT_UYVY  || cfg.dst.yuvfmt == YUVFMT_YUYV ) {
-                    b8mch_yuyv2p(pdst, psrc, INTERLACING);
+                    b8_mch_yuyv2p(pdst, psrc, INTERLACING);
                 }
             }
         }
