@@ -23,8 +23,8 @@
 #include "yuvfmt.h"
 
 enum {
-    B16_2_B10   = 0,
-    B10_2_B16   = 1,
+    B10_2_B16   = 0,
+    B16_2_B10   = 1,
     
     B16_2_B8    = 0,
     B8_2_B16    = 1,
@@ -34,6 +34,7 @@ enum {
     
     BIT_8       = 8,
     BIT_10      = 10,
+    BIT_16      = 16,
     
     ITL_2_SPL   = 0,
     SPL_2_ITL   = 1,
@@ -292,7 +293,8 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     
     ENTER_FUNC;
     
-    assert (tile->nlsb == rect->nlsb);
+    assert (tile->nbit == 8);
+    assert (rect->nbit == 8);
     assert (tile->width == rect->width);
     assert (tile->height == rect->height);
     
@@ -450,8 +452,8 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     
     ENTER_FUNC;
     
-    assert (tile->nlsb == rect->nlsb);
-    assert (tile->width == rect->width);
+    assert (tile->nbit == 8);
+    assert (rect->nbit == 8);    assert (tile->width == rect->width);
     assert (tile->height == rect->height);
     
     if (fmt == YUVFMT_400P) {
@@ -599,7 +601,7 @@ void b10_rect_unpack
     
     ENTER_FUNC;
     
-    b10_pack_unpack_fp = b_pack ? b10_linear_pack_lte : b10_linear_unpack_lte;
+    b10_pack_unpack_fp = (b_pack == B16_2_B10) ? b10_linear_pack_lte : b10_linear_unpack_lte;
     
     for (y=0; y<rect_h; ++y) 
     {
@@ -624,7 +626,8 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
 
     ENTER_FUNC;
     
-    assert (rect10->nlsb == rect16->nlsb);
+    assert (rect10->nbit == 10);
+    assert (rect16->nbit == 16);
     assert (rect10->width == rect16->width);
     assert (rect10->height == rect16->height);
     
@@ -742,7 +745,7 @@ int b10_tile_unpack
             uint8_t* p10 = &tile10_base[ts*ty + tsz*tx];
             uint8_t* p16 = &rect16_base[s * y + sizeof(uint16_t) * x];
             
-            if (b_pack) {
+            if (b_pack==B16_2_B10) {
                 b8_rect_2_linear(unpack_base, p16, tw*2, th, s);
                 b16_rect_transpose(unpack_base, tw, th);
                 b10_linear_pack_lte(p10, tsz, unpack_base, tw*th);
@@ -827,23 +830,27 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     return;
 }
 
-void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, int stride, int io_size)
+void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nbit, int btile, int stride, int io_size)
 {
     ENTER_FUNC;
     
     yuv->width      = w;
     yuv->height     = h;
     yuv->yuvfmt     = fmt;
-    yuv->nlsb       = nlsb;
+    yuv->nbit       = nbit;
     yuv->btile      = btile;
 
     if (btile) 
     {
         tile_t *t = &yuv->tile; 
-        if (yuv->nlsb == 10) { 
+        if (yuv->nbit == 10) { 
             t->tw = 3; t->th = 4; t->tsz = 16; 
-        } else { 
-            t->tw = 8; t->th = 4; t->tsz = 32; 
+        } else 
+        if (yuv->nbit == 8) { 
+            t->tw = 8; t->th = 4; t->tsz = 32;
+        } else {
+            printf("@err>> not support bitdepth (%d) for tile mode\n", yuv->nbit);
+            t->tw = 8; t->th = 4; t->tsz = 64;
         }
         
         yuv->y_stride = sat_div(w, t->tw) * t->tsz;
@@ -853,7 +860,7 @@ void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, in
     } 
     else 
     {
-        yuv->y_stride = sat_div(yuv->width * yuv->nlsb, 8);
+        yuv->y_stride = sat_div(yuv->width * yuv->nbit, 8);
         yuv->y_stride = max(stride,  yuv->y_stride);
         
         yuv->y_size = yuv->y_stride * yuv->height;
@@ -895,6 +902,10 @@ void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, in
     }
     
     yuv->io_size = max(io_size, yuv->io_size);
+    assert(yuv->buf_size >= yuv->io_size);
+    
+    void show_yuv_info(yuv_seq_t *yuv);
+    show_yuv_info(yuv);
 
     LEAVE_FUNC;
 }
@@ -906,6 +917,7 @@ void show_yuv_info(yuv_seq_t *yuv)
     printf("height      = %d\n" , yuv->height    );
     printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
     printf("nlsb        = %d\n" , yuv->nlsb      );
+    printf("nbit        = %d\n" , yuv->nbit      );
     printf("btile       = %d\n" , yuv->btile     );
     printf("y_stride    = %d\n" , yuv->y_stride  );
     printf("uv_stride   = %d\n" , yuv->uv_stride );
@@ -968,6 +980,9 @@ int b16_rect_2_b8_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
 
     ENTER_FUNC;
     
+    assert (rect16->nbit  == 16);
+    assert (rect16->nlsb  >= 8);
+    assert (rect08->nbit  == 8);
     assert (rect16->yuvfmt  == rect08->yuvfmt);
     assert (rect16->width   == rect08->width);
     assert (rect16->height  == rect08->height);
@@ -1197,30 +1212,6 @@ int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2yuyv)
     return 0;
 }
 
-int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
-{
-    int fmt = psrc->yuvfmt;
-    
-    ENTER_FUNC;
-
-    assert (psrc->nlsb == pdst->nlsb);
-    assert (psrc->width == pdst->width);
-    assert (psrc->height == pdst->height);
-    assert (pdst->yuvfmt  == get_spl_fmt(fmt));
-
-    if (fmt == YUVFMT_400P || fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
-        b8mch_p2p(psrc, pdst);    
-    } else if (is_semi_planar(fmt)) {
-        b8mch_sp2p(psrc, pdst, 0);
-    } else if (fmt == YUVFMT_UYVY  || fmt == YUVFMT_YUYV ) {
-        b8mch_yuyv2p(psrc, pdst, 0);
-    }
-    
-    LEAVE_FUNC;
-    
-    return 0;
-}
-
 static int arg_init (yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[]);
@@ -1272,11 +1263,11 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    seq[0].width = bit_sat(6, cfg.src.width);
-    seq[0].height = bit_sat(6, cfg.src.height);
-    seq[0].buf_size = seq[0].width * seq[0].height * 4 * 2;
     for (i=0; i<2; ++i) {
-        seq[i].pbuf = (uint8_t *)malloc(seq[0].buf_size);
+        seq[i].width = bit_sat(6, cfg.src.width);
+        seq[i].height = bit_sat(6, cfg.src.height);
+        seq[i].buf_size = seq[i].width * seq[i].height * 4 * 2;
+        seq[i].pbuf = (uint8_t *)malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
             printf("error: malloc seq[%d] fail\n", i);
             return -1;
@@ -1294,7 +1285,7 @@ int main(int argc, char **argv)
          *  read one frame
          */
         set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                cfg.src.yuvfmt, cfg.src.nlsb, cfg.src.btile, 
+                cfg.src.yuvfmt, cfg.src.nbit, cfg.src.btile, 
                 cfg.src.y_stride, cfg.src.io_size);
         
         r=fseek(cfg.src_fp, pdst->io_size * i, SEEK_SET);
@@ -1315,11 +1306,12 @@ int main(int argc, char **argv)
         /**
          *  b10-untile/unpack, b8-untile
          */
-        if (cfg.src.nlsb==10) 
+        if (cfg.src.nbit==10) 
         {
             SWAP_SRC_DST();
             set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                    cfg.src.yuvfmt, BIT_10, TILE_0, 0, 0);
+                    cfg.src.yuvfmt, BIT_16, TILE_0, 0, 0);
+            pdst->nlsb = 10;
             if (cfg.src.btile) {
                 b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
             } else {
@@ -1339,23 +1331,24 @@ int main(int argc, char **argv)
         /**
          *  bit-shift
          */
-        if (cfg.src.nlsb != cfg.dst.nlsb) {
-            if (cfg.src.nlsb==10 && cfg.dst.nlsb==8) {
+        if (pdst->nbit != cfg.dst.nbit) {
+            if (pdst->nbit==16 && cfg.dst.nbit==8) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
                 b16_rect_2_b8_mch(psrc, pdst, B16_2_B8);
             } 
-            else if (cfg.src.nlsb==8 && cfg.dst.nlsb==10) {
+            else if (pdst->nbit==8 && cfg.dst.nbit>8) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_10, TILE_0, 0, 0);
+                        cfg.src.yuvfmt, BIT_16, TILE_0, 0, 0);
+                pdst->nlsb = cfg.dst.nlsb;
                 b16_rect_2_b8_mch(pdst, psrc, B8_2_B16);
             }
         }
 
         /**
-         *  fmt convertion
+         * fmt convertion. TODO: nbit==BIT_16 support
          */        
         if (cfg.src.yuvfmt != cfg.dst.yuvfmt) 
         {
@@ -1396,7 +1389,7 @@ int main(int argc, char **argv)
         /**
          *  b10-tile/pack, b8-tile
          */
-        if (cfg.dst.nlsb==10) 
+        if (cfg.dst.nbit==10) 
         {
             SWAP_SRC_DST();
             if (cfg.dst.btile) {
@@ -1409,7 +1402,7 @@ int main(int argc, char **argv)
                 b10_rect_unpack_mch(psrc, pdst, B16_2_B10);
             }
         }
-        else
+        else if (cfg.dst.nbit==8)
         {
             if (cfg.dst.btile) {
                 SWAP_SRC_DST();
@@ -1418,6 +1411,10 @@ int main(int argc, char **argv)
                         cfg.dst.y_stride, cfg.dst.io_size);
                 b8_rect_2_tile_mch(psrc, pdst);
             }
+        }
+        else if (cfg.dst.nbit==16)
+        {
+            //TODO: 
         }
         
         r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst_fp);
@@ -1649,7 +1646,7 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
             i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
         } else
         if (0==strcmp(arg, "b10")) {
-            ++i;    seq->nlsb = 10;
+            ++i;    seq->nbit = 10;
         } else
         if (0==strcmp(arg, "btile")) {
             ++i;    seq->btile = 1;
@@ -1702,12 +1699,12 @@ static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
         printf("@cmdl>> Err : invalid resolution for src\n");
         return -1;
     }
-    if (psrc->nlsb != 8 && psrc->nlsb!=10) {
-        printf("@cmdl>> Err : invalid nlsb (%d) for src\n", psrc->nlsb);
+    if (psrc->nbit != 8 && psrc->nbit!=10) {
+        printf("@cmdl>> Err : invalid nbit (%d) for src\n", psrc->nbit);
         return -1;
     }
-    if (pdst->nlsb != 8 && pdst->nlsb!=10) {
-        printf("@cmdl>> Err : invalid nlsb (%d) for dst\n", pdst->nlsb);
+    if (pdst->nbit != 8 && pdst->nbit!=10) {
+        printf("@cmdl>> Err : invalid nbit (%d) for dst\n", pdst->nbit);
         return -1;
     }
     

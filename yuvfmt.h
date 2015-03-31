@@ -88,6 +88,7 @@ typedef struct _yuv_seq
     int     width;
     int     height;
     int     yuvfmt;
+    int     nbit;
     int     nlsb;
     int     btile;
     
