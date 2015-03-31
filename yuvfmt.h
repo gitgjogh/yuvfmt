@@ -24,10 +24,11 @@
 #define MAX_PATH 256
 #endif
 
-#define W_ALIGN_BIT     3
-#define H_ALIGN_BIT     3
-#define W_ALIGN_SIZE    (1<<W_ALIGN_BIT)
-#define H_ALIGN_SIZE    (1<<H_ALIGN_BIT)
+
+#ifndef max
+#define max(a,b) ((a)>(b) ? (a) : (b))
+#endif
+
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a)   (sizeof(a)/sizeof(a[0]))
@@ -86,8 +87,6 @@ typedef struct _yuv_seq
 {
     int     width;
     int     height;
-    int     w_align;
-    int     h_align;
     int     yuvfmt;
     int     nlsb;
     int     btile;
