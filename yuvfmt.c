@@ -524,6 +524,102 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     return 0;
 }
 
+int b16_rect_scale
+(
+    int w, int h, int lshift,
+    void* src_base, int src_stride,
+    void* dst_base, int dst_stride
+)
+{
+    int x, y;
+    int rshift = -lshift;
+    
+    for (y=0; y<h; ++y) 
+    {
+        uint16_t* src = (uint16_t*)((uint8_t*)src_base + y * src_stride);
+        uint16_t* dst = (uint16_t*)((uint8_t*)dst_base + y * dst_stride);
+        
+        if (lshift > 0) {
+            for (x=0; x<w; ++x) {
+                *dst++ = *src++ << lshift;
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *dst++ = *src++ >> rshift;
+            }
+        }
+    }
+    return 0;
+}
+
+int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
+{
+    uint8_t* src_base = psrc->pbuf;
+    uint8_t* dst_base = pdst->pbuf;
+    int src_stride = psrc->y_stride;
+    int dst_stride = pdst->y_stride;
+    
+    int fmt = psrc->yuvfmt;
+    int w   = psrc->width; 
+    int h   = psrc->height; 
+    int x, y;
+    
+    int lshift = (psrc->nlsb > 0) ? (16 - psrc->nlsb) : 0;
+    int rshift = (pdst->nlsb > 0) ? (16 - pdst->nlsb) : 0;
+    lshift -= rshift;
+    
+    ENTER_FUNC;
+    
+    assert(psrc->nbit==16 && pdst->nbit==16);
+    assert(psrc->nlsb!=0  && pdst->nlsb!=0 );
+    assert(psrc->yuvfmt   == pdst->yuvfmt  );
+    assert(psrc->width    == pdst->width   );
+    assert(psrc->height   == pdst->height  );
+
+    if      (fmt == YUVFMT_400P)
+    {
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    {
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+        
+        src_base   += psrc->y_size;
+        dst_base   += pdst->y_size; 
+        src_stride  = psrc->uv_stride;
+        dst_stride  = pdst->uv_stride;
+        
+        w   = w/2;
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+        
+        src_base   += psrc->uv_size;
+        dst_base   += pdst->uv_size;
+        
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+    }
+    else if (is_semi_planar(fmt))
+    {
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+        
+        src_base   += psrc->y_size;
+        dst_base   += pdst->y_size; 
+        src_stride  = psrc->uv_stride;
+        dst_stride  = pdst->uv_stride;
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+    }
+    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
+    {
+        w   = w*2;
+        b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
+    }
+    
+    return 0;
+}
+
 int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
 {
     #define TR_BUF_SIZE 4094
@@ -1177,7 +1273,9 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     return;
 }
 
-void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, int nbit, int btile, int stride, int io_size)
+void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, 
+                    int nbit, int nlsb, int btile, 
+                    int stride, int io_size)
 {
     ENTER_FUNC;
     
@@ -1185,6 +1283,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, int nbit, int btile, in
     yuv->height     = h;
     yuv->yuvfmt     = fmt;
     yuv->nbit       = nbit;
+    yuv->nlsb       = nlsb;
     yuv->btile      = btile;
 
     if (btile) 
@@ -1351,8 +1450,8 @@ int main(int argc, char **argv)
         /**
          *  read one frame
          */
-        set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                cfg.src.yuvfmt, cfg.src.nbit, cfg.src.btile, 
+        set_yuv_prop(pdst, cfg.src.width, cfg.src.height, cfg.src.yuvfmt, 
+                cfg.src.nbit, cfg.src.nlsb, cfg.src.btile, 
                 cfg.src.y_stride, cfg.src.io_size);
         
         r=fseek(cfg.src_fp, pdst->io_size * i, SEEK_SET);
@@ -1377,20 +1476,19 @@ int main(int argc, char **argv)
         {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                    cfg.src.yuvfmt, BIT_16, TILE_0, 0, 0);
-            pdst->nlsb = 10;
+                    cfg.src.yuvfmt, BIT_16, BIT_10, TILE_0, 0, 0);
             if (cfg.src.btile) {
                 b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
             } else {
                 b10_rect_unpack_mch(psrc, pdst, B10_2_B16);
             }
         } 
-        else
+        else if (cfg.src.nbit==8)
         {
             if (cfg.src.btile) {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
+                        cfg.src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
                 b8_tile_2_rect_mch(psrc, pdst, TILE2RECT);
             }
         }
@@ -1402,16 +1500,23 @@ int main(int argc, char **argv)
             if (pdst->nbit==16 && cfg.dst.nbit==8) {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
+                        cfg.src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
                 b16_n_b8_cvt_mch(psrc, pdst, B16_2_B8);
             } 
             else if (pdst->nbit==8 && cfg.dst.nbit>8) {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_16, TILE_0, 0, 0);
+                        cfg.src.yuvfmt, BIT_16, cfg.dst.nbit, TILE_0, 0, 0);
                 pdst->nlsb = cfg.dst.nlsb;
                 b16_n_b8_cvt_mch(pdst, psrc, B8_2_B16);
             }
+        } else if (cfg.dst.nbit == 16) {
+            if (pdst->nlsb != cfg.dst.nlsb) {
+                SWAP_SRC_DST();
+                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
+                        cfg.src.yuvfmt, BIT_16, BIT_16, TILE_0, 0, 0);
+                b16_mch_scale(psrc, pdst);
+            } 
         }
 
         /**
@@ -1419,15 +1524,25 @@ int main(int argc, char **argv)
          */        
         if (cfg.src.yuvfmt != cfg.dst.yuvfmt) 
         {
+            int nbit = pdst->nbit;
+            int nlsb = pdst->nlsb;
+            assert(nbit == 8 || nbit == 16);
+            int (*mch_p2p   )(yuv_seq_t*, yuv_seq_t*);
+            int (*mch_sp2p  )(yuv_seq_t*, yuv_seq_t*, int);
+            int (*mch_yuyv2p)(yuv_seq_t*, yuv_seq_t*, int);
+            mch_p2p    = (nbit==8) ? b8_mch_p2p    : b16_mch_p2p    ;
+            mch_sp2p   = (nbit==8) ? b8_mch_sp2p   : b16_mch_sp2p   ;
+            mch_yuyv2p = (nbit==8) ? b8_mch_yuyv2p : b16_mch_yuyv2p ;
+
             // uv de-interlace
             if (cfg.src.yuvfmt != get_spl_fmt(cfg.src.yuvfmt)) { 
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        get_spl_fmt(cfg.src.yuvfmt), BIT_8, TILE_0, 0, 0);
+                        get_spl_fmt(cfg.src.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.src.yuvfmt)) {
-                    b8_mch_sp2p(psrc, pdst, SPLITTING);
+                    mch_sp2p(psrc, pdst, SPLITTING);
                 } else if (cfg.src.yuvfmt == YUVFMT_UYVY || cfg.src.yuvfmt == YUVFMT_YUYV) {
-                    b8_mch_yuyv2p(psrc, pdst, SPLITTING);
+                    mch_yuyv2p(psrc, pdst, SPLITTING);
                 }
             }
             
@@ -1436,19 +1551,19 @@ int main(int argc, char **argv)
             {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        get_spl_fmt(cfg.dst.yuvfmt), BIT_8, TILE_0, 0, 0);
-                b8_mch_p2p(psrc, pdst); 
+                        get_spl_fmt(cfg.dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
+                mch_p2p(psrc, pdst); 
             }
 
             // uv interlace
             if (cfg.dst.yuvfmt != get_spl_fmt(cfg.dst.yuvfmt)) {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_8, TILE_0, 0, 0);
+                        cfg.dst.yuvfmt, nbit, nlsb, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.dst.yuvfmt)) {
-                    b8_mch_sp2p(pdst, psrc, INTERLACING);
+                    mch_sp2p(pdst, psrc, INTERLACING);
                 } else if (cfg.dst.yuvfmt == YUVFMT_UYVY  || cfg.dst.yuvfmt == YUVFMT_YUYV ) {
-                    b8_mch_yuyv2p(pdst, psrc, INTERLACING);
+                    mch_yuyv2p(pdst, psrc, INTERLACING);
                 }
             }
         }
@@ -1461,11 +1576,11 @@ int main(int argc, char **argv)
             SWAP_SRC_DST();
             if (cfg.dst.btile) {
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, TILE_1, 0, 0);
+                        cfg.dst.yuvfmt, BIT_10, BIT_10, TILE_1, 0, 0);
                 b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
             } else {
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, TILE_0, 0, 0);
+                        cfg.dst.yuvfmt, BIT_10, BIT_10, TILE_0, 0, 0);
                 b10_rect_unpack_mch(pdst, psrc, B16_2_B10);
             }
         }
@@ -1474,7 +1589,7 @@ int main(int argc, char **argv)
             if (cfg.dst.btile) {
                 SWAP_SRC_DST();
                 set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_8, TILE_1,
+                        cfg.dst.yuvfmt, BIT_8, BIT_8, TILE_1,
                         cfg.dst.y_stride, cfg.dst.io_size);
                 b8_tile_2_rect_mch(pdst, psrc, RECT2TILE);
             }
@@ -1657,8 +1772,8 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
     /**
      *  init options
      */
-    set_yuv_prop(&cfg->src, 0, 0, YUVFMT_420P, BIT_8, TILE_0, 0, 0);
-    set_yuv_prop(&cfg->dst, 0, 0, YUVFMT_420P, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->src, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->dst, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
     cfg->frame_range[1] = INT_MAX;
 
     /**
@@ -1713,10 +1828,16 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
             i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
         } else
         if (0==strcmp(arg, "b10")) {
-            ++i;    seq->nbit = 10;
+            ++i;    seq->nbit = 10;     seq->nlsb = 10;
         } else
-        if (0==strcmp(arg, "btile")) {
-            ++i;    seq->btile = 1;
+        if (0==strcmp(arg, "nbit") || 0==strcmp(arg, "b")) {
+            i = arg_parse_int(i, argc, argv, &seq->nbit);
+        } else
+        if (0==strcmp(arg, "nlsb")) {
+            i = arg_parse_int(i, argc, argv, &seq->nlsb);
+        } else
+        if (0==strcmp(arg, "btile") || 0==strcmp(arg, "tile") || 0==strcmp(arg, "t")) {
+            ++i;    seq->btile = 1;     seq->yuvfmt = YUVFMT_420SP;
         } else  
         if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
             int nframe = 0;
@@ -1766,14 +1887,21 @@ static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
         printf("@cmdl>> Err : invalid resolution for src\n");
         return -1;
     }
-    if (psrc->nbit != 8 && psrc->nbit!=10) {
-        printf("@cmdl>> Err : invalid nbit (%d) for src\n", psrc->nbit);
+    if ((psrc->nbit != 8 && psrc->nbit!=10 && psrc->nbit!=16) ||
+        (psrc->nbit < psrc->nlsb)) {
+        printf("@cmdl>> Err : invalid bitdepth (%d/%d) for src\n", 
+                psrc->nlsb, psrc->nbit);
         return -1;
     }
-    if (pdst->nbit != 8 && pdst->nbit!=10) {
-        printf("@cmdl>> Err : invalid nbit (%d) for dst\n", pdst->nbit);
+    if ((pdst->nbit != 8 && pdst->nbit!=10 && psrc->nbit!=16) ||
+        (pdst->nbit < pdst->nlsb)) {
+        printf("@cmdl>> Err : invalid bitdepth (%d/%d) for dst\n", 
+                pdst->nlsb, pdst->nbit);
         return -1;
     }
+    
+    psrc->nlsb = psrc->nlsb ? psrc->nlsb : psrc->nbit;
+    pdst->nlsb = pdst->nlsb ? pdst->nlsb : pdst->nbit;
     
     LEAVE_FUNC;
     
