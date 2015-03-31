@@ -215,6 +215,10 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 
     ENTER_FUNC;
     
+    assert((psrc->nbit==8 && pdst->nbit==8) || (psrc->nbit==16 && pdst->nbit==16));
+    assert(is_mch_planar(src_fmt));
+    assert(is_mch_planar(dst_fmt));
+    
     for (y=0; y<h; ++y) {
         memcpy(dst_y, src_y, linesize);
         dst_y += pdst->y_stride;
@@ -270,6 +274,10 @@ int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
 
     ENTER_FUNC;
     
+    assert(itl->nbit==8 && spl->nbit==8);
+    assert(is_semi_planar(itl->yuvfmt));
+    assert(is_mch_planar(spl->yuvfmt));
+    
     for (y=0; y<h; ++y) {
         uint8_t* itl_y = itl_y_base + y * itl->y_stride;
         uint8_t* spl_y = spl_y_base + y * spl->y_stride;
@@ -319,6 +327,10 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int x, y;
 
     ENTER_FUNC;
+    
+    assert(itl->nbit==8 && spl->nbit==8);
+    assert(is_mch_mixed(itl->yuvfmt));
+    assert(is_mch_planar(spl->yuvfmt));
 
     w   = w/2;
 
@@ -395,6 +407,10 @@ int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
 
     ENTER_FUNC;
     
+    assert(itl->nbit==16 && spl->nbit==16);
+    assert(is_semi_planar(itl->yuvfmt));
+    assert(is_mch_planar(spl->yuvfmt));
+    
     for (y=0; y<h; ++y) {
         uint16_t* itl_y = (uint16_t*)(itl_y_base + y * itl->y_stride);
         uint16_t* spl_y = (uint16_t*)(spl_y_base + y * spl->y_stride);
@@ -444,6 +460,10 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int x, y;
 
     ENTER_FUNC;
+    
+    assert(itl->nbit==16 && spl->nbit==16);
+    assert(is_mch_mixed(itl->yuvfmt));
+    assert(is_mch_planar(spl->yuvfmt));
 
     w   = w/2;
 
@@ -968,8 +988,10 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
     
     assert (rect10->nbit == 10);
     assert (rect16->nbit == 16);
+    assert (rect16->nlsb == 10);
     assert (rect10->width == rect16->width);
     assert (rect10->height == rect16->height);
+    assert (rect10->yuvfmt == rect16->yuvfmt);
     
     if      (fmt == YUVFMT_400P)
     {
@@ -1089,6 +1111,14 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     int s   = rect16->y_stride;
     uint8_t *pt = tile10->pbuf;
     uint8_t *pl = rect16->pbuf;
+    
+    assert (tile10->btile == 1);
+    assert (tile10->nbit == 10);
+    assert (rect16->nbit == 16);
+    assert (rect16->nlsb == 10);
+    assert (tile10->width == rect16->width);
+    assert (tile10->height == rect16->height);
+    assert (tile10->yuvfmt == rect16->yuvfmt);
     
     if      (fmt == YUVFMT_400P)
     {
