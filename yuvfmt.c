@@ -52,7 +52,7 @@ typedef struct resolution {
 const static res_t cmn_res[] = {
     {"qcif",    176,    144},
     {"cif",     352,    288},
-    {"360",     480,    360},
+    {"360",     640,    360},
     {"480",     720,    480},
     {"720",     1280,   720},
     {"1080",    1920,   1080},
@@ -617,6 +617,8 @@ int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
         b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
     }
     
+    LEAVE_FUNC;
+    
     return 0;
 }
 
@@ -847,9 +849,10 @@ void b8_rect_2_linear_width_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
     }
 }
 
-void b8_linear_2_rect(int b_l2r, uint8_t* line, uint8_t* rect, int w, int h, int s)
+void b8_linear_2_rect(int dir, uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     void (*map_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
+    int b_l2r = (dir==LINE2RECT);
     
     if        ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) ) {
         map_func_p = b_l2r ? b8_linear_2_rect_align_0 : b8_rect_2_linear_align_0;
@@ -1270,7 +1273,7 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     
     LEAVE_FUNC;
 
-    return;
+    return 0;
 }
 
 void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, 
@@ -1893,7 +1896,7 @@ static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
                 psrc->nlsb, psrc->nbit);
         return -1;
     }
-    if ((pdst->nbit != 8 && pdst->nbit!=10 && psrc->nbit!=16) ||
+    if ((pdst->nbit != 8 && pdst->nbit!=10 && pdst->nbit!=16) ||
         (pdst->nbit < pdst->nlsb)) {
         printf("@cmdl>> Err : invalid bitdepth (%d/%d) for dst\n", 
                 pdst->nlsb, pdst->nbit);
