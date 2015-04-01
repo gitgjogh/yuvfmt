@@ -877,8 +877,6 @@ void b8_tile_2_rect
     int x, y, tx, ty;
     void (*map_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
     int b_l2r = (b_t2r == TILE2RECT);
-    
-    ENTER_FUNC;
 
     if        ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) ) {
         map_func_p = b_l2r ? b8_linear_2_rect_align_0 : b8_rect_2_linear_align_0;
@@ -901,7 +899,7 @@ void b8_tile_2_rect
         }
     } 
     
-    LEAVE_FUNC;
+    return;
 }
 
 void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect, int b_t2r)
@@ -1068,8 +1066,6 @@ void b10_rect_unpack
     int x, y;
     void (*b10_pack_unpack_fp)(void* b10_base, int n_byte, void* b16_base, int n16);
     
-    ENTER_FUNC;
-    
     b10_pack_unpack_fp = (b_pack == B16_2_B10) ? b10_linear_pack_lte : b10_linear_unpack_lte;
     
     for (y=0; y<rect_h; ++y) 
@@ -1079,7 +1075,7 @@ void b10_rect_unpack
         b16_base += b16_stride;
     }
     
-    LEAVE_FUNC;
+    return;
 }
 
 int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
@@ -1158,8 +1154,6 @@ int b10_tile_unpack
 {
     int x, y, tx, ty;
     
-    ENTER_FUNC;
-    
     assert( (tsz & 7) == 0 );
     assert( ts >= (w*th*5+3)/4 );
     
@@ -1199,8 +1193,6 @@ int b10_tile_unpack
     {
         free(unpack_base);
     }
-    
-    LEAVE_FUNC;
     
     return w*h;
 }
@@ -1280,8 +1272,6 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
                     int nbit, int nlsb, int btile, 
                     int stride, int io_size)
 {
-    ENTER_FUNC;
-    
     yuv->width      = w;
     yuv->height     = h;
     yuv->yuvfmt     = fmt;
@@ -1354,9 +1344,9 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     assert(yuv->buf_size >= yuv->io_size);
     
     void show_yuv_prop(yuv_seq_t *yuv);
-    show_yuv_prop(yuv);
+    //show_yuv_prop(yuv);
 
-    LEAVE_FUNC;
+    return;
 }
 
 void show_yuv_prop(yuv_seq_t *yuv)
