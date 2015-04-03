@@ -104,7 +104,7 @@ typedef struct _yuv_seq
 
 } yuv_seq_t;
 
-typedef struct _yuv_cfg
+typedef struct _yuv_cvt_opt
 {
     int     frame_range[2];
 
@@ -116,6 +116,12 @@ typedef struct _yuv_cfg
     FILE*       dst_fp;
     yuv_seq_t   dst;
     
-} yuv_cfg_t;
+} cvt_opt_t;
+
+typedef struct _yuv_cmp_opt
+{
+    yuv_seq_t   seq[3];     /* src1,src2,diff */
+    
+} cmp_opt_t;
 
 #endif
