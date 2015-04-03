@@ -1397,6 +1397,13 @@ static int cvt_arg_help()
     return 0;
 }
 
+/**
+ *  @param [in] pdst description for target yuv format
+ *      The buffer @pdst bound is just for median used. "pdst->pbuf"
+ *      is not guaranteed to hold the target yuv data at any point.
+ *  @param [in] psrc hold yuv buffer compliant to source yuv format (@psrc itself)
+ *  @return either @pdst or @psrc which hold yuv buffer compliant to @pdst
+ */
 yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     yuv_seq_t cfg_src, cfg_dst;
@@ -1917,6 +1924,136 @@ static int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     return 0;
 }
 
+dstat_t b8_rect_diff(int w, int h, uint8_t *base[3], 
+                     int stride[3], dstat_t *stat)
+{
+    int i, j, k, d;
+    dstat_t st = {w*h, 0, 0};
+    for (j=0; j<h; ++j) {
+        uint8_t *base0 = base[0] + j * stride[0];
+        uint8_t *base1 = base[1] + j * stride[1];
+        uint8_t *base2 = base[2] + j * stride[2];
+        for (i=0; i<w; i+=8) {
+            d = (int)(*base0++) - (int)(*base1++);
+            d = d>0 ? d : -d;
+            (*base2++) = (uint8_t)d;
+            st.sad += d;
+            st.ssd += d*d;
+        }
+    }
+    
+    if (stat) {
+        stat->cnt += st.cnt;
+        stat->sad += st.sad;
+        stat->ssd += st.ssd;
+    }
+    
+    return st;
+}
+
+dstat_t b16_rect_diff(int w, int h, uint8_t *base[3], 
+                      int stride[3], dstat_t *stat)
+{
+    int i, j, k, d;
+    dstat_t st = {w*h, 0, 0};
+    for (j=0; j<h; ++j) {
+        uint16_t *base0 = (uint16_t *)(base[0] + j * stride[0]);
+        uint16_t *base1 = (uint16_t *)(base[1] + j * stride[1]);
+        uint16_t *base2 = (uint16_t *)(base[2] + j * stride[2]);
+        for (i=0; i<w; i+=8) {
+            d = (int)(*base0++) - (int)(*base1++);
+            d = d>0 ? d : -d;
+            (*base2++) = (uint16_t)d;
+            st.sad += d;
+            st.ssd += d*d;
+        }
+    }
+    
+    if (stat) {
+        stat->cnt += st.cnt;
+        stat->sad += st.sad;
+        stat->ssd += st.ssd;
+    }
+    
+    return st;
+}
+
+dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2, 
+                 yuv_seq_t *diff, dstat_t *stat)
+{
+    yuv_seq_t*  seq[3] = {seq1, seq2, diff};
+    uint8_t*    base[3] = {0};
+    int         stride[3] = {0};
+    
+    int fmt = seq1->yuvfmt;
+    int w   = seq1->width; 
+    int h   = seq1->height;
+    int i;
+    dstat_t (*rect_diff)(int w, int h, uint8_t *base[3], 
+                         int stride[3], dstat_t *stat);
+    dstat_t st = {0};
+    
+    ENTER_FUNC;
+    
+    rect_diff = (seq1->nbit == 8) ? b8_rect_diff : b16_rect_diff;
+    
+    for (i=0; i<3; ++i) {
+        base[i]   = seq[i]->pbuf;
+        stride[i] = seq[i]->y_stride;
+    }
+
+    if      (fmt == YUVFMT_400P)
+    {
+        rect_diff(w, h, base, stride, &st);
+    }
+    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+    {
+        rect_diff(w, h, base, stride, &st);
+        
+        for (i=0; i<3; ++i) {
+            base[i]  += seq[i]->y_size;
+            stride[i] = seq[i]->uv_stride;
+        }
+        w   = w/2;
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        rect_diff(w, h, base, stride, &st);
+        
+        for (i=0; i<3; ++i) {
+            base[i]  += seq[i]->uv_size;
+        }
+        
+        rect_diff(w, h, base, stride, &st);
+    }
+    else if (is_semi_planar(fmt))
+    {
+        rect_diff(w, h, base, stride, &st);
+        
+        for (i=0; i<3; ++i) {
+            base[i]  += seq[i]->y_size;
+            stride[i] = seq[i]->uv_stride;
+        }        
+        h   = is_mch_422(fmt) ? h : h/2;
+        
+        rect_diff(w, h, base, stride, &st);
+    }
+    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
+    {
+        w   = w*2;
+        rect_diff(w, h, base, stride, &st);
+    }
+    
+    LEAVE_FUNC;
+    
+    if (stat) {
+        stat->cnt += st.cnt;
+        stat->sad += st.sad;
+        stat->ssd += st.ssd;
+    }
+    
+    return st;
+}
+
 static int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
 {
     return 0;
@@ -1924,16 +2061,177 @@ static int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
 
 static int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
 {
-    return 0;
+    int i, j;
+    yuv_seq_t *yuv = &cfg->seq[0];
+    yuv_seq_t *seq = &cfg->seq[0];
+    
+    ENTER_FUNC;
+    
+    if (argc<2) {
+        return -1;
+    }
+    if (0 != strcmp(argv[1], "-i0") && 0 != strcmp(argv[1], "-i1") &&
+        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") )
+    {
+        return -1;
+    }
+    
+    /**
+     *  init options
+     */
+    set_yuv_prop(&cfg->seq[0], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->seq[1], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    cfg->frame_range[1] = INT_MAX;
+
+    /**
+     *  loop options
+     */    
+    for (i=1; i>=0 && i<argc; )
+    {
+        char *arg = argv[i];
+        if (arg[0]!='-') {
+            printf("@cmdl>> Err : unrecognized arg `%s`\n", arg);
+            return -i;
+        }
+        arg += 1;
+        
+        for (j=0; j<ARRAY_SIZE(cmn_res); ++j) {
+            if (0==strcmp(arg, cmn_res[j].name)) {
+                yuv->width  = cmn_res[j].w;
+                yuv->height = cmn_res[j].h;
+                break;
+            }
+        }
+        if (j<ARRAY_SIZE(cmn_res)) {
+            ++i; continue;
+        }
+        
+        for (j=0; j<ARRAY_SIZE(cmn_fmt); ++j) {
+            if (0==strcmp(arg, cmn_fmt[j].name)) {
+                seq->yuvfmt = cmn_fmt[j].ifmt;
+                break;
+            }
+        }
+        if (j<ARRAY_SIZE(cmn_fmt)) {
+            ++i; continue;
+        }
+        
+        if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
+            cvt_arg_help();
+            return -1;
+        } else
+        if (0==strcmp(arg, "i0")) {
+            seq = &cfg->seq[0];
+            i = arg_parse_str(i, argc, argv, &cfg->seq[0].path);
+        } else
+        if (0==strcmp(arg, "i1")) {
+            seq = &cfg->seq[1];
+            i = arg_parse_str(i, argc, argv, &cfg->seq[1].path);
+        } else
+        if (0==strcmp(arg, "o") || 0==strcmp(arg, "diff")) {
+            i = arg_parse_str(i, argc, argv, &cfg->seq[2].path);
+        } else
+        if (0==strcmp(arg, "wxh")) {
+            i = arg_parse_wxh(i, argc, argv, yuv);
+        } else
+        if (0==strcmp(arg, "fmt")) {
+            i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
+        } else
+        if (0==strcmp(arg, "b10")) {
+            ++i;    seq->nbit = 10;     seq->nlsb = 10;
+        } else
+        if (0==strcmp(arg, "nbit") || 0==strcmp(arg, "b")) {
+            i = arg_parse_int(i, argc, argv, &seq->nbit);
+        } else
+        if (0==strcmp(arg, "nlsb")) {
+            i = arg_parse_int(i, argc, argv, &seq->nlsb);
+        } else
+        if (0==strcmp(arg, "btile") || 0==strcmp(arg, "tile") || 0==strcmp(arg, "t")) {
+            ++i;    seq->btile = 1;     seq->yuvfmt = YUVFMT_420SP;
+        } else
+        if (0==strcmp(arg, "stride")) {
+            i = arg_parse_int(i, argc, argv, &seq->y_stride);
+        } else
+        if (0==strcmp(arg, "iosize")) {
+            i = arg_parse_int(i, argc, argv, &seq->io_size);
+        } else
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
+            int nframe = 0;
+            i = arg_parse_int(i, argc, argv, &nframe);
+            cfg->frame_range[1] = nframe + cfg->frame_range[0];
+        } else
+        if (0==strcmp(arg, "f-start")) {
+            i = arg_parse_int(i, argc, argv, &cfg->frame_range[0]);
+        } else
+        if (0==strcmp(arg, "f-range") || 0==strcmp(arg, "f")) {
+            i = arg_parse_range(i, argc, argv, cfg->frame_range);
+        } else
+        if (0==strcmp(arg, "blksz")) {
+            i = arg_parse_range(i, argc, argv, &cfg->blksz);
+        } else
+        {
+            printf("@cmdl>> Err : invalid opt `%s`\n", arg);
+            return -i;
+        }
+    }
+    
+    LEAVE_FUNC;
+
+    return i;
 }
 
 static int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
 {
+    int i = 0;
+    yuv_seq_t* yuv = &cfg->seq[0];
+    for (i=0; i<2; ++i) 
+    {
+        yuv_seq_t* psrc = &cfg->seq[i];
+        if (!psrc->path) {
+            printf("@cmdl>> Err : no input %d\n", i);
+            return -1;
+        }
+        
+        if ((psrc->nbit!= 8 && psrc->nbit!=10 && psrc->nbit!=16) || 
+            (psrc->nbit < psrc->nlsb)) {
+            printf("@cmdl>> Err : invalid bitdepth (%d/%d) for input %d\n", 
+                    psrc->nlsb, psrc->nbit, i);
+            return -1;
+        }
+        psrc->nlsb = psrc->nlsb ? psrc->nlsb : psrc->nbit;
+    }
+    
+    if (!yuv->width || !yuv->height) {
+        printf("@cmdl>> Err : invalid resolution(%dx%d)\n",
+                yuv->width, yuv->height);
+        return -1;
+    }
+    cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
+    cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
+        
+    if (cfg->frame_range[0] >= cfg->frame_range[1]) {
+        printf("@cmdl>> Err : Invalid frame_range %d~%d\n", 
+                cfg->frame_range[0], cfg->frame_range[1]);
+        return -1;
+    }
+    
+    LEAVE_FUNC;
+    
     return 0;
 }
 
 static int cmp_arg_help()
 {
+    printf("-i0 name<%%s> {...yuv props...} \n");
+    printf("-i1 name<%%s> {...yuv props...} \n");
+    printf("-o  name<%%s> {...yuv props...} \n");
+    printf("\n...yuv props...\n");
+    printf("\t [-wxh <%%dx%%d>]\n");
+    printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
+    printf("\t [-stride <%%d>]\n");
+    printf("\t [-fsize <%%d>]\n");
+    printf("\t [-b10]\n");
+    printf("\t [-btile]\n");
     return 0;
 }
 
@@ -1941,13 +2239,16 @@ int yuv_cmp(int argc, char **argv)
 {
     int         r, i;
     cmp_opt_t   cfg;
-    yuv_seq_t   seq[3];
+    yuv_seq_t   seq[4];
+    yuv_seq_t*  spl[2];
+    yuv_seq_t*  ptmp;
+    dstat_t     stat[2] = {{0}, {0}};
     
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
     r = cmp_arg_parse(&cfg, argc, argv);
     if (r < 0) {
-        cvt_arg_help();
+        cmp_arg_help();
         return 1;
     }
     r = cmp_arg_check(&cfg, argc, argv);
@@ -1961,7 +2262,8 @@ int yuv_cmp(int argc, char **argv)
     int w_align = bit_sat(6, cfg.seq[0].width);
     int h_align = bit_sat(6, cfg.seq[0].height);
     int nbyte   = 1 + (cfg.seq[0].nbit > 8 || cfg.seq[1].nbit > 8);
-    for (i=0; i<2; ++i) 
+    char* fm[3] = {"rb", "rb", "wb"};
+    for (i=0; i<3; ++i) 
     {
         cfg.seq[i].fp = fopen(cfg.seq[i].path, "rb");
         if ( !cfg.seq[i].fp ) {
@@ -1977,16 +2279,65 @@ int yuv_cmp(int argc, char **argv)
         }
     }
     
+    set_yuv_prop(&seq[3], cfg.seq[0].width, cfg.seq[0].height, 
+            get_spl_fmt(cfg.seq[0].yuvfmt), 
+            cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
+            cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
+            TILE_0, 0, 0);
+
     /*************************************************************************
      *                          frame loop
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
+        printf("\n@frm> **** %d ****\n", i);
+
+        for (i=0; i<2; ++i) 
+        {
+            set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
+            r=fseek(cfg.seq[i].fp, seq[i].io_size * i, SEEK_SET);
+            if (r) {
+                printf("%d: fseek %d error\n", i, seq[i].io_size * i);
+                return -1;
+            }
+            r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.seq[i].fp);
+            if (r<1) {
+                if ( feof(cfg.seq[i].fp) ) {
+                    printf("%d: reach file end, force stop\n", i);
+                } else {
+                    printf("%d: error reading file\n", i);
+                }
+                break;
+            }
+            
+            // get one buffer unused
+            ptmp = (i==0) ? &seq[2] : 
+                            (spl[0] == &seq[0] ? &seq[1] : &seq[0]);
+            set_yuv_prop_by_copy(ptmp, &seq[3]);
+            yuv_cvt_frame(ptmp, &seq[i]);
+        }
+        
+        for (i=0; i<3; ++i) {
+            if (&seq[i] != spl[0] && &seq[i] != spl[1]) {
+                ptmp = &seq[i];
+                break;
+            }
+        }
+        set_yuv_prop_by_copy(ptmp, &seq[3]);
+        stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
+        
+        if (cfg.seq[2].fp) {
+            r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
+            if (r<1) {
+                printf("error writing file\n");
+                break;
+            }
+        }
     }
     
-    for (i=0; i<2; ++i) {
+    for (i=0; i<3; ++i) {
+        if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);
         if (seq[i].pbuf)    free(seq[i].pbuf);
-        if (seq[i].fp)      fclose(seq[i].fp);
     }
     
     return 0;

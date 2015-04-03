@@ -103,7 +103,7 @@ typedef struct _yuv_seq
     uint8_t *pbuf;
     
     char*   path;
-    void*   fp;
+    FILE*   fp;
 
 } yuv_seq_t;
 
@@ -123,5 +123,13 @@ typedef struct _yuv_cmp_opt
     int     frame_range[2];
     
 } cmp_opt_t;
+
+typedef struct _diff_stat
+{
+    uint64_t    cnt;
+    uint64_t    sad;
+    uint64_t    ssd;
+    
+}dstat_t;
 
 #endif
