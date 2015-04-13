@@ -11,7 +11,7 @@ all : $(OBJS) $(TARGET)
 
 $(TARGET) : $(OBJS)
 	$(CC) $(INCLUDES) $(CPPFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
-%.o : %.c
+%.o : %.c *.h
 	$(CC) $(INCLUDES) $(CPPFLAGS) -c $<
 clean : 
 	rm -f $(OBJS) $(TARGET)

@@ -589,6 +589,9 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
 yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     yuv_seq_t cfg_src, cfg_dst;
+    
+    ENTER_FUNC;
+
     memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
     memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
     
@@ -597,6 +600,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     } while(0)
     
     SWAP_SRC_DST();
+    
     /**
      *  b10-untile/unpack, b8-untile
      */
@@ -726,6 +730,8 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     {
         //TODO: 
     }
+    
+    LEAVE_FUNC;
     
     return pdst;
 }
