@@ -27,7 +27,11 @@
 
 double get_stat_psnr(dstat_t *s)
 {
-    return 10.0 * log(s->ssd / ((double)65025 * s->cnt) ) / log(10.0);
+    if (s->ssd) {
+        return 10.0 * log10( (double)65025 * s->cnt / s->ssd );
+    } else {
+        return 0;
+    }
 }
 
 
@@ -353,6 +357,7 @@ int yuv_cmp(int argc, char **argv)
     yuv_seq_t*  spl[2];
     yuv_seq_t*  ptmp;
     dstat_t     stat[2] = {{0}, {0}};
+    double      psnr = 0;
     
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
@@ -443,12 +448,8 @@ int yuv_cmp(int argc, char **argv)
         set_yuv_prop_by_copy(ptmp, &seq[3]);
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
-        if (stat[0].ssd == 0) {
-            printf("@frm>> #%d: the two frame is the same\n", j);
-        } else {
-            double psnr = get_stat_psnr(&stat[0]);
-            printf("@frm>> #%d: PSNR = %.2d\n", j, psnr);
-        }
+        psnr = get_stat_psnr(&stat[0]);
+        printf("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.seq[2].fp) {
             r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
@@ -459,12 +460,8 @@ int yuv_cmp(int argc, char **argv)
         }
     }
     
-    if (stat[1].ssd == 0) {
-        printf("@seq>> the two file is the same\n");
-    } else {
-        double psnr = get_stat_psnr(&stat[1]);
-        printf("@seq>> PSNR = %.2d\n", psnr);
-    }
+    psnr = get_stat_psnr(&stat[1]);
+    printf("@seq>> PSNR = %.2llf\n", psnr);
     
     for (i=0; i<3; ++i) {
         if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);
