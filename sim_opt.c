@@ -14,42 +14,62 @@
  * limitations under the License.
 *****************************************************************************/
 
+#include <assert.h>
 #include <limits.h>
+#include <string.h>
 
 #include "yuvdef.h"
-#include "yuvopt.h"
+#include "sim_opt.h"
 
-const res_t cmn_res[] = {
-    {"qcif",    176,    144},
-    {"cif",     352,    288},
-    {"360",     640,    360},
-    {"480",     720,    480},
-    {"720",     1280,   720},
-    {"1080",    1920,   1080},
-    {"2k",      1920,   1080},
-    {"1088",    1920,   1088},
-    {"2k+",     1920,   1088},
-    {"2160",    3840,   2160},
-    {"4k",      3840,   2160},
-    {"2176",    3840,   2176},
-    {"4k+",     3840,   2176},
-};
 
-const fmt_t cmn_fmt[] = {
-    {"400p",    YUVFMT_400P     },
-    {"420p",    YUVFMT_420P     },
-    {"420sp",   YUVFMT_420SP    },
-    {"420spa",  YUVFMT_420SPA   },
-    {"422p",    YUVFMT_422P     },
-    {"422sp",   YUVFMT_422SP    },
-    {"422spa",  YUVFMT_422SPA   },
-    {"uyvy",    YUVFMT_UYVY     },
-    {"yuyv",    YUVFMT_YUYV     },
-};
+void iof_cfg(ios_t *f, const char *path, const char *mode)
+{
+    f->b_used = 1;
+    if (path) {
+        strncpy(f->path, path, MAX_PATH);
+    }
+    if (mode) {
+        strncpy(f->mode, mode, MAX_MODE);
+    }
+}
 
-const int n_cmn_res = ARRAY_SIZE(cmn_res);
-const int n_cmn_fmt = ARRAY_SIZE(cmn_fmt);
+void ios_cfg(ios_t *ios, int ch, const char *path, const char *mode)
+{
+    iof_cfg(&ios[ch], path, mode);
+}
 
+int ios_open(ios_t *ios, int nch)
+{
+    int ch, j;
+    for (ch=j=0; ch<nch; ++ch) {
+        ios_t *f = &ios[ch];
+        if (f->b_used) {
+            f->fp = fopen(f->path, f->mode);
+            if( f->fp ){
+                printf("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
+                ++ j;
+            } else {
+                printf("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+            }
+        }
+    }
+    return j;   
+}
+
+int ios_close(ios_t *ios, int nch)
+{
+    int ch, j;
+    for (ch=j=0; ch<nch; ++ch) {
+        ios_t *f = &ios[ch];
+        if (f->b_used && f->fp) {
+            printf("@ios>> ch#%d fclose(%s)\n", ch, f->path);
+            fclose(f->fp);
+            f->fp = 0;
+            ++ j;
+        }
+    }
+    return j;  
+}
 
 char *get_argv(int argc, char *argv[], int i, char *name)
 {
@@ -74,64 +94,6 @@ char* get_uint32 (char *str, uint32_t *out)
     }
 
     return curr;
-}
-
-int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
-{
-    int j, w, h;
-    char *flag=0;
-    char *last=0;
-    pw = pw ? pw : &w;
-    ph = ph ? ph : &h;
-    
-    char *arg = GET_ARGV(++ i, "wxh");
-    if (!arg) {
-        return -1;
-    }
-    
-    for (j=0; j<n_cmn_res; ++j) {
-        if (0==strcmp(arg, cmn_res[j].name)) {
-            *pw = cmn_res[j].w;  
-            *ph = cmn_res[j].h;
-            return ++i;
-        }
-    }
-    
-    //seq->width = strtoul (arg, &flag, 10);
-    flag = get_uint32 (arg, pw);
-    if (flag==0 || *flag != 'x') {
-        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
-        return -1;
-    }
-    
-    //seq->height = strtoul (flag + 1, &last, 10);
-    last = get_uint32 (flag + 1, ph);
-    if (last == 0 || *last != 0 ) {
-        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
-        return -1;
-    }
-
-    return ++i;
-}
-
-int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
-{
-    int j;
-    
-    char *arg = GET_ARGV(++ i, "yuvfmt");
-    if (!arg) {
-        return -1;
-    }
-    
-    for (j=0; j<n_cmn_fmt; ++j) {
-        if (0==strcmp(arg, cmn_fmt[j].name)) {
-            *fmt = cmn_fmt[j].ifmt;
-            return ++i;
-        }
-    }
-    
-    printf("@cmdl>> Err : unrecognized yuvfmt `%s`\n", arg);
-    return -1;
 }
 
 int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
@@ -184,6 +146,14 @@ int arg_parse_str(int i, int argc, char *argv[], char **p)
 int arg_parse_int(int i, int argc, char *argv[], int *p)
 {
     char *arg = GET_ARGV(++ i, "int");
-    *p = arg ? atoi(arg) : (-1);
+    *p = arg ? atoi(arg) : 0;
     return arg ? ++i : -1;
 }
+
+int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
+{
+    char *arg = GET_ARGV(++ i, "int");
+    *p = arg ? atoi(arg) : default_val;
+    return arg ? ++i : i;
+}
+

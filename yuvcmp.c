@@ -22,7 +22,7 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
-#include "yuvopt.h"
+#include "sim_opt.h"
 
 
 double get_stat_psnr(dstat_t *s)

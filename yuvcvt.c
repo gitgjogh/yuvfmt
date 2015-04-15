@@ -21,7 +21,97 @@
 
 #include "yuvdef.h"
 #include "yuvcvt.h"
-#include "yuvopt.h"
+#include "sim_opt.h"
+
+
+const res_t cmn_res[] = {
+    {"qcif",    176,    144},
+    {"cif",     352,    288},
+    {"360",     640,    360},
+    {"480",     720,    480},
+    {"720",     1280,   720},
+    {"1080",    1920,   1080},
+    {"2k",      1920,   1080},
+    {"1088",    1920,   1088},
+    {"2k+",     1920,   1088},
+    {"2160",    3840,   2160},
+    {"4k",      3840,   2160},
+    {"2176",    3840,   2176},
+    {"4k+",     3840,   2176},
+};
+
+const fmt_t cmn_fmt[] = {
+    {"400p",    YUVFMT_400P     },
+    {"420p",    YUVFMT_420P     },
+    {"420sp",   YUVFMT_420SP    },
+    {"420spa",  YUVFMT_420SPA   },
+    {"422p",    YUVFMT_422P     },
+    {"422sp",   YUVFMT_422SP    },
+    {"422spa",  YUVFMT_422SPA   },
+    {"uyvy",    YUVFMT_UYVY     },
+    {"yuyv",    YUVFMT_YUYV     },
+};
+
+const int n_cmn_res = ARRAY_SIZE(cmn_res);
+const int n_cmn_fmt = ARRAY_SIZE(cmn_fmt);
+
+int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
+{
+    int j, w, h;
+    char *flag=0;
+    char *last=0;
+    pw = pw ? pw : &w;
+    ph = ph ? ph : &h;
+    
+    char *arg = GET_ARGV(++ i, "wxh");
+    if (!arg) {
+        return -1;
+    }
+    
+    for (j=0; j<n_cmn_res; ++j) {
+        if (0==strcmp(arg, cmn_res[j].name)) {
+            *pw = cmn_res[j].w;  
+            *ph = cmn_res[j].h;
+            return ++i;
+        }
+    }
+    
+    //seq->width = strtoul (arg, &flag, 10);
+    flag = get_uint32 (arg, pw);
+    if (flag==0 || *flag != 'x') {
+        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        return -1;
+    }
+    
+    //seq->height = strtoul (flag + 1, &last, 10);
+    last = get_uint32 (flag + 1, ph);
+    if (last == 0 || *last != 0 ) {
+        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        return -1;
+    }
+
+    return ++i;
+}
+
+int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
+{
+    int j;
+    
+    char *arg = GET_ARGV(++ i, "yuvfmt");
+    if (!arg) {
+        return -1;
+    }
+    
+    for (j=0; j<n_cmn_fmt; ++j) {
+        if (0==strcmp(arg, cmn_fmt[j].name)) {
+            *fmt = cmn_fmt[j].ifmt;
+            return ++i;
+        }
+    }
+    
+    printf("@cmdl>> Err : unrecognized yuvfmt `%s`\n", arg);
+    return -1;
+}
 
 /** 
  *  422p <-> 420p uv down/up sampling
@@ -824,7 +914,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_int(i, argc, argv, &seq->nlsb);
         } else
         if (0==strcmp(arg, "btile") || 0==strcmp(arg, "tile") || 0==strcmp(arg, "t")) {
-            ++i;    seq->btile = 1;     seq->yuvfmt = YUVFMT_420SP;
+            i = opt_parse_int(i, argc, argv, &seq->btile, 1);
+            seq->btile ? (seq->yuvfmt = YUVFMT_420SP) : 0;
         } else  
         if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
             int nframe = 0;

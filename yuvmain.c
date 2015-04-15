@@ -14,8 +14,9 @@
  * limitations under the License.
 *****************************************************************************/
 
+#include <stdio.h>
+
 #include "yuvdef.h"
-#include "yuvopt.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
 
