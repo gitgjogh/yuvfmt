@@ -205,7 +205,7 @@ uint32_t slog_nstr_time33(const char *key, uint32_t keylen)
 {
     int      c = 0;
     uint32_t i, h;
-    for (i=h=0; c=key[i] && i<keylen; ++i) {
+    for (i=h=0; (c=key[i]) && (i<keylen); ++i) {
         h = h * 33 + c; 
     } 
 
@@ -372,7 +372,7 @@ static int slog_head_assert(slog_t *kl, const char *key, uint32_t keylen)
 
 static int slog_tail_assert(slog_t *kl)
 {
-    slog_group_assert(kl, 1, 0, 0);
+    slog_group_assert(kl, 0, 0, 0);
 }
 
 static int slogv_group(slog_t *kl, int b_head, const char *fmt, va_list ap)
@@ -385,7 +385,7 @@ static int slogv_group(slog_t *kl, int b_head, const char *fmt, va_list ap)
     }
 
     int keylen = b_head ? slog_get_keylen(fmt) : 0;
-    if (slog_group_assert(kl, b_head, fmt, keylen)) {
+    if (slog_group_assert(kl, b_head, fmt+1, keylen)) {
         return vfprintf(kl->fp, fmt, ap);
     }
 
