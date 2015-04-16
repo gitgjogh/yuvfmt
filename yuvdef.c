@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include "sim_log.h"
 #include "yuvdef.h"
 
 
@@ -201,9 +202,8 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     
     yuv->io_size = max(io_size, yuv->io_size);
     assert(!yuv->pbuf || yuv->buf_size >= yuv->io_size);
-    
-    void show_yuv_prop(yuv_seq_t *yuv);
-    //show_yuv_prop(yuv);
+
+    show_yuv_prop(yuv);
 
     return;
 }
@@ -218,23 +218,27 @@ void set_yuv_prop_by_copy(yuv_seq_t *dst, yuv_seq_t *src)
 
 void show_yuv_prop(yuv_seq_t *yuv)
 {
-    printf("\n");
-    printf("width       = %d\n" , yuv->width     );
-    printf("height      = %d\n" , yuv->height    );
-    printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
-    printf("nlsb        = %d\n" , yuv->nlsb      );
-    printf("nbit        = %d\n" , yuv->nbit      );
-    printf("btile       = %d\n" , yuv->btile     );
-    printf("y_stride    = %d\n" , yuv->y_stride  );
-    printf("uv_stride   = %d\n" , yuv->uv_stride );
-    printf("y_size      = %d\n" , yuv->y_size    );
-    printf("uv_size     = %d\n" , yuv->uv_size   );
-    printf("io_size     = %d\n" , yuv->io_size   );
-    printf("buf_size    = %d\n" , yuv->buf_size  );
-    printf("buf_base    = 0x%08x\n" , yuv->pbuf  );
+#define XTR_X(v) xlog__(#v "=0x%08x, ", yuv->v)
+#define XTR_I(v) xlog__(#v "=%d, ", yuv->v)
+
+    xlog("@yuv> 0x%08x : {", yuv);
     
-    printf("tile.tw     = %d\n" , yuv->tile.tw   );
-    printf("tile.th     = %d\n" , yuv->tile.th   );
-    printf("tile.tsz    = %d\n" , yuv->tile.tsz  );
-    printf("\n");
+    XTR_I(width     );
+    XTR_I(height    );
+    XTR_I(yuvfmt    );
+    XTR_I(nlsb      );
+    XTR_I(nbit      );
+    XTR_I(btile     );
+    XTR_I(y_stride  );
+    XTR_I(uv_stride );
+    XTR_I(y_size    );
+    XTR_I(uv_size   );
+    XTR_I(io_size   );
+    XTR_I(buf_size  );
+    XTR_X(pbuf      );
+    XTR_I(tile.tw   );
+    XTR_I(tile.th   );
+    XTR_I(tile.tsz  );
+    
+    xlog__("}\n");
 }

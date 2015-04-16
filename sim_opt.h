@@ -17,6 +17,8 @@
 #ifndef __SIM_OPT_H__
 #define __SIM_OPT_H__
 
+#include "sim_log.h"
+
 #ifndef MAX_PATH
 #define MAX_PATH    256
 #endif
@@ -42,5 +44,6 @@ int     arg_parse_range(int i, int argc, char *argv[], int i_range[2]);
 int     arg_parse_str(int i, int argc, char *argv[], char **p);
 int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
+int     arg_parse_xkey(int i, int argc, char *argv[], slog_t *kl);
 
 #endif  // __SIM_OPT_H__

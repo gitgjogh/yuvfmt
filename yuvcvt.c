@@ -828,6 +828,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 
 int cvt_arg_init (cvt_opt_t *cfg, int argc, char *argv[])
 {
+    xinit(1);
 }
 
 int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
@@ -934,6 +935,27 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "iosize")) {
             i = arg_parse_int(i, argc, argv, &seq->io_size);
         } else
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_L_NON);
+        } else
+        if (0==strcmp(arg, "xkey")) {
+            ++i;    xlevel(SLOG_L_KEY);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_L_ALL);
+        } else
+        if (0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
+        if (0==strcmp(arg, "xadd") || 0==strcmp(arg, "x")) {
+            char *keyset = 0;
+            i = arg_parse_str(i, argc, argv, &keyset);
+            if (i>0) {
+                xbinds(SLOG_L_KEY, keyset);
+            }
+        } else
         {
             printf("@cmdl>> Err : invalid opt `%s`\n", arg);
             return -i;
@@ -1009,6 +1031,8 @@ int yuv_cvt(int argc, char **argv)
 
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
+    cvt_arg_init (&cfg, argc, argv);
+    
     r = cvt_arg_parse(&cfg, argc, argv);
     if (r < 0) {
         cvt_arg_help();
