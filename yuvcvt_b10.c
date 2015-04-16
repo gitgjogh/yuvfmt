@@ -216,7 +216,7 @@ int b10_tile_unpack
     {
         unpack_base = (uint8_t*) malloc ( size_needed );
         if (unpack_base==0) {
-            printf("%s : malloc fail!\n", __FUNCTION__);
+            xerr("%s : malloc fail!\n", __FUNCTION__);
             return 0;
         }
     }

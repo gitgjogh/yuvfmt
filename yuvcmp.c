@@ -22,7 +22,6 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
-#include "sim_opt.h"
 
 
 double get_stat_psnr(dstat_t *s)
@@ -201,7 +200,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     {
         char *arg = argv[i];
         if (arg[0]!='-') {
-            printf("@cmdl>> Err : unrecognized arg `%s`\n", arg);
+            xerr("@cmdl>> unrecognized arg `%s`\n", arg);
             return -i;
         }
         arg += 1;
@@ -281,7 +280,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_range(i, argc, argv, &cfg->blksz);
         } else
         {
-            printf("@cmdl>> Err : invalid opt `%s`\n", arg);
+            xerr("@cmdl>> invalid opt `%s`\n", arg);
             return -i;
         }
     }
@@ -302,13 +301,13 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     {
         yuv_seq_t* psrc = &cfg->seq[i];
         if (!psrc->path) {
-            printf("@cmdl>> Err : no input %d\n", i);
+            xerr("@cmdl>> no input %d\n", i);
             return -1;
         }
         
         if ((psrc->nbit!= 8 && psrc->nbit!=10 && psrc->nbit!=16) || 
             (psrc->nbit < psrc->nlsb)) {
-            printf("@cmdl>> Err : invalid bitdepth (%d/%d) for input %d\n", 
+            xerr("@cmdl>> invalid bitdepth (%d/%d) for input %d\n", 
                     psrc->nlsb, psrc->nbit, i);
             return -1;
         }
@@ -316,7 +315,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     }
     
     if (!yuv->width || !yuv->height) {
-        printf("@cmdl>> Err : invalid resolution(%dx%d)\n",
+        xerr("@cmdl>> invalid resolution(%dx%d)\n",
                 yuv->width, yuv->height);
         return -1;
     }
@@ -324,7 +323,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
         
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
-        printf("@cmdl>> Err : Invalid frame_range %d~%d\n", 
+        xerr("@cmdl>> Invalid frame_range %d~%d\n", 
                 cfg->frame_range[0], cfg->frame_range[1]);
         return -1;
     }
@@ -368,9 +367,9 @@ int yuv_cmp(int argc, char **argv)
     }
     r = cmp_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        printf("\n****src1****\n");  show_yuv_prop(&cfg.seq[0]);
-        printf("\n****src2****\n");  show_yuv_prop(&cfg.seq[1]);
-        printf("\n****diff****\n");  show_yuv_prop(&cfg.seq[2]);
+        xlog("@yuv> src1 \n");  show_yuv_prop(&cfg.seq[0]);
+        xlog("@yuv> src2 \n");  show_yuv_prop(&cfg.seq[1]);
+        xlog("@yuv> diff \n");  show_yuv_prop(&cfg.seq[2]);
         return 1;
     }
 
@@ -385,7 +384,7 @@ int yuv_cmp(int argc, char **argv)
         if (cfg.seq[i].path) {
             cfg.seq[i].fp = fopen(cfg.seq[i].path, fmode);
             if ( !cfg.seq[i].fp ) {
-                printf("error : open %s fail\n", cfg.seq[i].path);
+                xerr("open %s fail\n", cfg.seq[i].path);
                 return -1;
             }
         }
@@ -393,7 +392,7 @@ int yuv_cmp(int argc, char **argv)
         seq[i].buf_size = w_align * h_align * 3 * nbyte;
         seq[i].pbuf = malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
-            printf("error: malloc seq[%d] fail\n", i);
+            xerr("malloc seq[%d] fail\n", i);
             return -1;
         }
     }
@@ -409,22 +408,22 @@ int yuv_cmp(int argc, char **argv)
      ************************************************************************/
     for (j=cfg.frame_range[0]; j<cfg.frame_range[1]; j++) 
     {
-        printf("\n@frm> **** %d ****\n", j);
+        xlog("@frm> **** %d ****\n", j);
 
         for (i=0; i<2; ++i) 
         {
             set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
             r=fseek(cfg.seq[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
-                printf("%d: fseek %d error\n", i, seq[i].io_size * j);
+                xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
                 return -1;
             }
             r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.seq[i].fp);
             if (r<1) {
                 if ( feof(cfg.seq[i].fp) ) {
-                    printf("@seq>> $%d: reach file end, force stop\n", i);
+                    xlog("@seq>> $%d: reach file end, force stop\n", i);
                 } else {
-                    printf("@seq>> $%d: error reading file\n", i);
+                    xerr("@seq>> $%d: error reading file\n", i);
                 }
                 break;
             }
@@ -449,19 +448,19 @@ int yuv_cmp(int argc, char **argv)
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
-        printf("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
+        xlog("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.seq[2].fp) {
             r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
             if (r<1) {
-                printf("error writing file\n");
+                xerr("error writing file\n");
                 break;
             }
         }
     }
     
     psnr = get_stat_psnr(&stat[1]);
-    printf("@seq>> PSNR = %.2llf\n", psnr);
+    xlog("@seq>> PSNR = %.2llf\n", psnr);
     
     for (i=0; i<3; ++i) {
         if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);

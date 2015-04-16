@@ -46,10 +46,10 @@ int ios_open(ios_t *ios, int nch)
         if (f->b_used) {
             f->fp = fopen(f->path, f->mode);
             if( f->fp ){
-                printf("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
+                xlog("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
                 ++ j;
             } else {
-                printf("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+                xlog("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
             }
         }
     }
@@ -62,7 +62,7 @@ int ios_close(ios_t *ios, int nch)
     for (ch=j=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used && f->fp) {
-            printf("@ios>> ch#%d fclose(%s)\n", ch, f->path);
+            xlog("@ios>> ch#%d fclose(%s)\n", ch, f->path);
             fclose(f->fp);
             f->fp = 0;
             ++ j;
@@ -76,7 +76,7 @@ char *get_argv(int argc, char *argv[], int i, char *name)
     int s = i<argc ? argv[i][0] : 0;
     char *arg = (s != 0 && s != '-') ? argv[i] : 0;
     if (name) {
-        printf("@cmdl>> get_argv[%s]=%s\n", name, arg?arg:"");
+        xlog("@cmdl>> get_argv[%s]=%s\n", name, arg?arg:"");
     }
     return arg;
 }
@@ -117,14 +117,14 @@ int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
 
     /* get `~$last` or `+$count` */
     if (*flag != '~' && *flag != '+') {
-        printf("@cmdl>> Err : Invalid flag\n");
+        xlog("@cmdl>> Err : Invalid flag\n");
         return -1;
     }
     
     //i_range[1] = strtoul (flag + 1, &last, 10);
     last = get_uint32 (flag + 1, &i_range[1]);
     if (last == 0 || *last != 0 ) {
-        printf("@cmdl>> Err : Invalid count/end\n");
+        xlog("@cmdl>> Err : Invalid count/end\n");
         i_range[1] = INT_MAX;
         return -1;
     }

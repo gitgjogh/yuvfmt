@@ -155,7 +155,7 @@ int slog_init(slog_t *kl, slog_head_t* hash_tbl, int hash_depth_log2,
     memset(kl, 0, sizeof(slog_t));
     
     kl->hash_depth_log2 = hash_depth_log2;
-    kl->hash_depth  = (1 << hash_depth_log2);
+    kl->hash_depth  = (1 << hash_depth_log2) - 1;
     kl->hash_tbl    = hash_tbl;
     
     kl->node_tbl    = node_tbl;
@@ -173,13 +173,13 @@ int slog_open(slog_t *kl, int hash_depth_log2, int depth)
     
     slog_head_t *hash_tbl = malloc(hash_tblsz);
     if (!hash_tbl) {
-        printf("@err>> malloc hash_tbl falied\n");
+        xerr("malloc hash_tbl falied\n");
         return 0;
     }
     
     slog_node_t *node_tbl = malloc(node_tblsz);
     if (!hash_tbl) {
-        printf("@err>> malloc node_tbl falied\n");
+        xerr("malloc node_tbl falied\n");
         free(hash_tbl);
         return 0;
     }
@@ -201,23 +201,23 @@ void slog_close(slog_t *kl)
 }    
 
 static 
-uint32_t slog_nstr_time33(const char *key, uint32_t keylen)
+uint32_t slog_nstr_time33(const uint8_t *key, uint32_t keylen)
 {
-    int      c = 0;
+    uint32_t c = 0;
     uint32_t i, h;
     for (i=h=0; (c=key[i]) && (i<keylen); ++i) {
-        h = h * 33 + c; 
+        h = h * 33u + c; 
     } 
 
     return h; 
 }
 
 static 
-uint32_t slog_cstr_time33(const char *key, uint32_t *keylen)
+uint32_t slog_cstr_time33(const uint8_t *key, uint32_t *keylen)
 {
-    int      c = 0;
+    uint32_t c = 0;
     uint32_t i, h;
-    for (i=h=0; c=key[i]; ++i) {
+    for (i=h=0; (c=key[i]); ++i) {
         h = h * 33 + c; 
     } 
 
@@ -259,7 +259,7 @@ slog_node_t* slog_touch_node(slog_t* kl, const char *key, uint32_t keylen,
         b_found ? (*b_found = 0) : 0;
         
         if (kl->used >= kl->depth) {
-            printf("@err>> slog table overflow!\n");
+            xerr("slog table overflow!\n");
             return 0;
         }
         
