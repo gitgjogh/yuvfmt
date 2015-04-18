@@ -189,6 +189,6 @@ int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
 int arg_parse_xkey(int i, int argc, char *argv[], slog_t *kl)
 {
     const char *arg = GET_ARGV(++ i, "xkey");
-    arg ? slog_binds(kl ? kl : xlog_ptr, SLOG_L_KEY, arg) : 0;
+    arg ? slog_binds(kl ? kl : xlog_ptr, SLOG_L_ADD, arg) : 0;
     return arg ? ++i : i;
 }

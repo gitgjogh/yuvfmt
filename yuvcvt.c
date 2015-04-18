@@ -829,12 +829,18 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 int cvt_arg_init (cvt_opt_t *cfg, int argc, char *argv[])
 {
     xinit(SLOG_L_ADD);
+    xbinds(SLOG_L_ADD, "cfg,cmdl");
+    set_yuv_prop(&cfg->src, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->dst, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    cfg->frame_range[1] = INT_MAX;
 }
 
 int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
 {
     int i, j;
     yuv_seq_t *seq = &cfg->dst;
+    yuv_seq_t *src = &cfg->src;
+    yuv_seq_t *dst = &cfg->dst;
     
     ENTER_FUNC;
     
@@ -842,17 +848,11 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     if (0 != strcmp(argv[1], "-dst") && 0 != strcmp(argv[1], "-src") &&
-        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") )
+        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") &&
+        0 != strcmp(argv[1], "-x")   && 0 != strcmp(argv[1], "-xall"))
     {
         return -1;
     }
-    
-    /**
-     *  init options
-     */
-    set_yuv_prop(&cfg->src, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    set_yuv_prop(&cfg->dst, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    cfg->frame_range[1] = INT_MAX;
 
     /**
      *  loop options
@@ -868,8 +868,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         
         for (j=0; j<n_cmn_res; ++j) {
             if (0==strcmp(arg, cmn_res[j].name)) {
-                seq->width  = cmn_res[j].w;
-                seq->height = cmn_res[j].h;
+                src->width  = cmn_res[j].w;
+                src->height = cmn_res[j].h;
                 break;
             }
         }
@@ -892,15 +892,19 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             return -1;
         } else
         if (0==strcmp(arg, "src")) {
+            char *src_path = 0;
             seq = &cfg->src;
-            i = arg_parse_str(i, argc, argv, &cfg->ios[CVT_IOS_SRC].path);
+            i = arg_parse_str(i, argc, argv, &src_path);
+            ios_cfg(cfg->ios, CVT_IOS_SRC, src_path, "rb");
         } else
         if (0==strcmp(arg, "dst")) {
+            char *dst_path = 0;
             seq = &cfg->dst;
-            i = arg_parse_str(i, argc, argv, &cfg->ios[CVT_IOS_DST].path);
+            i = arg_parse_str(i, argc, argv, &dst_path);
+            ios_cfg(cfg->ios, CVT_IOS_DST, dst_path, "wb");
         } else
         if (0==strcmp(arg, "wxh")) {
-            i = arg_parse_wxh(i, argc, argv, &seq->width, &seq->height);
+            i = arg_parse_wxh(i, argc, argv, &src->width, &src->height);
         } else
         if (0==strcmp(arg, "fmt")) {
             i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
@@ -918,7 +922,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             i = opt_parse_int(i, argc, argv, &seq->btile, 1);
             seq->btile ? (seq->yuvfmt = YUVFMT_420SP) : 0;
         } else  
-        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "nframe") ||0==strcmp(arg, "n")) {
             int nframe = 0;
             i = arg_parse_int(i, argc, argv, &nframe);
             cfg->frame_range[1] = nframe + cfg->frame_range[0];
@@ -1008,6 +1012,14 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
         ios_close(cfg->ios, CVT_IOS_CNT);
         return -1;
     }
+    
+    pdst->width  = psrc->width;
+    pdst->height = psrc->height;
+    set_yuv_prop_by_copy(psrc, psrc);
+    set_yuv_prop_by_copy(pdst, pdst);
+    xlog("@cfg> src: ");  show_yuv_prop(psrc);
+    xlog("@cfg> dst: ");  show_yuv_prop(pdst);
+    
     LEAVE_FUNC;
     
     return 0;
@@ -1020,16 +1032,29 @@ int cvt_arg_close(cvt_opt_t *cfg)
 
 int cvt_arg_help()
 {
-    printf("-dst name<%%s> {...yuv props...} \n");
-    printf("-src name<%%s> {...yuv props...} \n");
-    printf("[-frame <%%d>]\n");
-    printf("\n...yuv props...\n");
+    printf("yuv format convertor. Options:\n");
+    printf("\t -dst name<%%s> {...props...}\n");
+    printf("\t -src name<%%s> {...props...}\n");
+    printf("\t -f   <%%d~%%d>\n");
+    
+    printf("\nset yuv props as follow:\n");
     printf("\t [-wxh <%%dx%%d>]\n");
     printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
     printf("\t [-stride <%%d>]\n");
-    printf("\t [-fsize <%%d>]\n");
+    printf("\t [-iosize <%%d>]  //frame buf size\n");
     printf("\t [-b10]\n");
-    printf("\t [-btile]\n");
+    printf("\t [-btile|-tile|-t]\n");
+    
+    printf("\nset frame range as follow:\n");
+    printf("\t [-f-range|-f <%%d~%%d>]\n");
+    printf("\t [-f-start    <%%d>]\n");
+    printf("\t [-n-frame|-n <%%d>]\n");
+    
+    int j;
+    printf("\nwxh can be short as follow:\n");
+    for (j=0; j<n_cmn_res; ++j) {
+        printf("\t -%-4s : %4dx%-4d\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+    }
     return 0;
 }
 
@@ -1045,13 +1070,14 @@ int yuv_cvt(int argc, char **argv)
     
     r = cvt_arg_parse(&cfg, argc, argv);
     if (r < 0) {
+        xerr("cvt_arg_parse() failed\n");
         cvt_arg_help();
         return 1;
     }
     r = cvt_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        xlog("@yuv> src \n");  show_yuv_prop(&cfg.src);
-        xlog("@yuv> dst \n");  show_yuv_prop(&cfg.dst);
+        xerr("cvt_arg_check() failed\n");
+        cvt_arg_help();
         return 1;
     }
     
@@ -1072,16 +1098,14 @@ int yuv_cvt(int argc, char **argv)
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        xlog("@frm> **** %d ****\n", i);
-        
-        set_yuv_prop_by_copy(&seq[0], &cfg.src);
-        
-        r=fseek(cfg.ios[CVT_IOS_SRC].fp, seq[0].io_size * i, SEEK_SET);
+        xlog("@frm> #%d +\n", i);
+        r=fseek(cfg.ios[CVT_IOS_SRC].fp, cfg.src.io_size * i, SEEK_SET);
         if (r) {
-            xerr("fseek %d error\n", seq[0].io_size * i);
+            xerr("fseek %d error\n", cfg.src.io_size * i);
             return -1;
         }
-        r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
+        
+        r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
             if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
                 xlog("@seq> reach file end, force stop\n");
@@ -1090,7 +1114,8 @@ int yuv_cvt(int argc, char **argv)
             }
             break;
         }
-        
+
+        set_yuv_prop_by_copy(&seq[0], &cfg.src);
         set_yuv_prop_by_copy(&seq[1], &cfg.dst);
         yuv_seq_t *pdst = yuv_cvt_frame(&seq[1], &seq[0]);
         
@@ -1099,6 +1124,7 @@ int yuv_cvt(int argc, char **argv)
             xerr("error writing file\n");
             break;
         }
+        xlog("@frm> #%d -\n", i);
     } // end frame loop
     
     for (i=0; i<2; ++i) {

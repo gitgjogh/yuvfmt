@@ -23,7 +23,7 @@
 
 typedef enum log_level {
     SLOG_L_NON  = 0,
-    SLOG_L_ADD  = 1,
+    SLOG_L_ADD  = 64,
     SLOG_L_KEY  = 127,
     SLOG_L_ALL  = 128,
 } log_level_i;

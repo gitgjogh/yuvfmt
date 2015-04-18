@@ -202,8 +202,6 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     yuv->io_size = max(io_size, yuv->io_size);
     assert(!yuv->pbuf || yuv->buf_size >= yuv->io_size);
 
-    show_yuv_prop(yuv);
-
     return;
 }
 
@@ -220,7 +218,7 @@ void show_yuv_prop(yuv_seq_t *yuv)
 #define XTR_X(v) xlog__(#v "=0x%08x, ", yuv->v)
 #define XTR_I(v) xlog__(#v "=%d, ", yuv->v)
 
-    xlog("@yuv> 0x%08x : {", yuv);
+    xlog__("@yuv> 0x%08x : {", yuv);
     
     XTR_I(width     );
     XTR_I(height    );
