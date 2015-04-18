@@ -17,6 +17,8 @@
 #ifndef __YUVCVT_H__
 #define __YUVCVT_H__
 
+#include "sim_opt.h"
+
 enum {
     B10_2_B16   = 0,
     B16_2_B10   = 1,
@@ -58,8 +60,15 @@ const char* show_fmt(int ifmt);
 int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph);
 int arg_parse_fmt(int i, int argc, char *argv[], int *fmt);
 
+enum cvt_ios_channel {
+    CVT_IOS_DST = 0,
+    CVT_IOS_SRC = 1,
+    CVT_IOS_CNT,
+};
+
 typedef struct _yuv_cvt_opt
 {
+    ios_t   ios[2];
     int     frame_range[2];
 
     yuv_seq_t   src;

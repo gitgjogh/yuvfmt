@@ -25,15 +25,18 @@
 #define MAX_MODE    8
 typedef struct file_io {
     int     b_used;
-    char    path[MAX_PATH];
+    char    path_buf[MAX_PATH];
+    char    *path;
     char    mode[MAX_MODE];
-    FILE    *fp;
+    void    *fp;
 } ios_t;
 
 void    iof_cfg(ios_t *p, const char *path, const char *mode);
 void    ios_cfg(ios_t *p, int ch, const char *path, const char *mode);
-int     ios_open(ios_t *p, int nch);
+int     ios_nused(ios_t *p, int nch);
+int     ios_open(ios_t *p, int nch, int *nop);
 int     ios_close(ios_t *p, int nch);
+int     ios_feof(ios_t *p, int ich);
 
 
 #define GET_ARGV(idx, name) get_argv(argc, argv, idx, name);
@@ -42,6 +45,7 @@ char*   get_uint32 (char *str, uint32_t *out);
 
 int     arg_parse_range(int i, int argc, char *argv[], int i_range[2]);
 int     arg_parse_str(int i, int argc, char *argv[], char **p);
+int     arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz);
 int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
 int     arg_parse_xkey(int i, int argc, char *argv[], slog_t *kl);

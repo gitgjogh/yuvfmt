@@ -24,9 +24,10 @@
 
 void iof_cfg(ios_t *f, const char *path, const char *mode)
 {
-    f->b_used = 1;
+    f->b_used = (path && mode);
     if (path) {
-        strncpy(f->path, path, MAX_PATH);
+        strncpy(f->path_buf, path, MAX_PATH);
+        f->path = f->path_buf;
     }
     if (mode) {
         strncpy(f->mode, mode, MAX_MODE);
@@ -38,10 +39,19 @@ void ios_cfg(ios_t *ios, int ch, const char *path, const char *mode)
     iof_cfg(&ios[ch], path, mode);
 }
 
-int ios_open(ios_t *ios, int nch)
+int ios_nused(ios_t *ios, int nch)
 {
     int ch, j;
     for (ch=j=0; ch<nch; ++ch) {
+        j += (!!ios[ch].b_used);
+    }
+    return j;   
+}
+
+int ios_open(ios_t *ios, int nch, int *nop)
+{
+    int ch, j, k;
+    for (ch=j=k; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used) {
             f->fp = fopen(f->path, f->mode);
@@ -49,11 +59,13 @@ int ios_open(ios_t *ios, int nch)
                 xlog("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
                 ++ j;
             } else {
-                xlog("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+                xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+                ++ k;
             }
         }
     }
-    return j;   
+    nop ? (*nop = j) : 0;
+    return (k==0);   
 }
 
 int ios_close(ios_t *ios, int nch)
@@ -69,6 +81,11 @@ int ios_close(ios_t *ios, int nch)
         }
     }
     return j;  
+}
+
+int ios_feof(ios_t *p, int ich)
+{
+    return feof((FILE*)p[ich].fp);
 }
 
 char *get_argv(int argc, char *argv[], int i, char *name)
@@ -140,6 +157,18 @@ int arg_parse_str(int i, int argc, char *argv[], char **p)
 {
     char *arg = GET_ARGV(++ i, "string");
     *p = arg ? arg : 0;
+    return arg ? ++i : -1;
+}
+
+int arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz)
+{
+    char *arg = GET_ARGV(++ i, "string");
+    if (arg) {
+        strncpy(buf, arg, nsz);
+        buf[nsz-1] = 0;
+    } else {
+        buf[0] = 0;
+    }
     return arg ? ++i : -1;
 }
 

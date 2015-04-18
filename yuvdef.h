@@ -19,7 +19,6 @@
 
 
 #include <stdint.h>
-#include <stdio.h>
 #include "sim_log.h"
 
 
@@ -111,8 +110,8 @@ typedef struct _yuv_seq
     int     buf_size;
     uint8_t *pbuf;
     
-    char*   path;
-    FILE*   fp;
+    //char*   path;
+    //FILE*   fp;
 
 } yuv_seq_t;
 

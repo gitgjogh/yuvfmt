@@ -893,11 +893,11 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         } else
         if (0==strcmp(arg, "src")) {
             seq = &cfg->src;
-            i = arg_parse_str(i, argc, argv, &cfg->src.path);
+            i = arg_parse_str(i, argc, argv, &cfg->ios[CVT_IOS_SRC].path);
         } else
         if (0==strcmp(arg, "dst")) {
             seq = &cfg->dst;
-            i = arg_parse_str(i, argc, argv, &cfg->dst.path);
+            i = arg_parse_str(i, argc, argv, &cfg->ios[CVT_IOS_DST].path);
         } else
         if (0==strcmp(arg, "wxh")) {
             i = arg_parse_wxh(i, argc, argv, &seq->width, &seq->height);
@@ -974,7 +974,8 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     
     ENTER_FUNC;
     
-    if (!cfg->src.path || !cfg->dst.path) {
+    if (!cfg->ios[CVT_IOS_DST].path || 
+        !cfg->ios[CVT_IOS_SRC].path) {
         xerr("@cmdl>> no src or dst\n");
         return -1;
     }
@@ -1003,9 +1004,18 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     psrc->nlsb = psrc->nlsb ? psrc->nlsb : psrc->nbit;
     pdst->nlsb = pdst->nlsb ? pdst->nlsb : pdst->nbit;
     
+    if (!ios_open(cfg->ios, CVT_IOS_CNT, 0)) {
+        ios_close(cfg->ios, CVT_IOS_CNT);
+        return -1;
+    }
     LEAVE_FUNC;
     
     return 0;
+}
+
+int cvt_arg_close(cvt_opt_t *cfg)
+{
+    ios_close(cfg->ios, CVT_IOS_CNT);
 }
 
 int cvt_arg_help()
@@ -1045,16 +1055,6 @@ int yuv_cvt(int argc, char **argv)
         return 1;
     }
     
-    cfg.dst.fp = fopen(cfg.dst.path, "wb");
-    cfg.src.fp = fopen(cfg.src.path, "rb");
-    if( !cfg.dst.fp || !cfg.src.fp )
-    {
-        xerr("open %s %s fail\n", 
-                cfg.dst.fp ? "" : cfg.dst.path, 
-                cfg.src.fp ? "" : cfg.src.path);
-        return -1;
-    }
-    
     int w_align = bit_sat(6, cfg.src.width);
     int h_align = bit_sat(6, cfg.src.height);
     int nbyte   = 1 + (cfg.src.nbit > 8 || cfg.src.nbit > 8);
@@ -1076,14 +1076,14 @@ int yuv_cvt(int argc, char **argv)
         
         set_yuv_prop_by_copy(&seq[0], &cfg.src);
         
-        r=fseek(cfg.src.fp, seq[0].io_size * i, SEEK_SET);
+        r=fseek(cfg.ios[CVT_IOS_SRC].fp, seq[0].io_size * i, SEEK_SET);
         if (r) {
             xerr("fseek %d error\n", seq[0].io_size * i);
             return -1;
         }
-        r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.src.fp);
+        r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
-            if ( feof(cfg.src.fp) ) {
+            if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
                 xlog("@seq> reach file end, force stop\n");
             } else {
                 xerr("error reading file\n");
@@ -1094,7 +1094,7 @@ int yuv_cvt(int argc, char **argv)
         set_yuv_prop_by_copy(&seq[1], &cfg.dst);
         yuv_seq_t *pdst = yuv_cvt_frame(&seq[1], &seq[0]);
         
-        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst.fp);
+        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.ios[CVT_IOS_DST].fp);
         if (r<1) {
             xerr("error writing file\n");
             break;
@@ -1104,9 +1104,8 @@ int yuv_cvt(int argc, char **argv)
     for (i=0; i<2; ++i) {
         if (seq[i].pbuf)    free(seq[i].pbuf);
     }
-    
-    if (cfg.dst.fp)     fclose(cfg.dst.fp);
-    if (cfg.src.fp)     fclose(cfg.src.fp);
+
+    cvt_arg_close(&cfg);
 
     return 0;
 }

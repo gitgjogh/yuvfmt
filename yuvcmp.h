@@ -17,8 +17,16 @@
 #ifndef __YUVCMP_H__
 #define __YUVCMP_H__
 
+#include "sim_log.h"
+
+enum cmp_ios_channel {
+    CMP_IOS_DIFF = 2,
+    CMP_IOS_CNT,
+};
+
 typedef struct _yuv_cmp_opt
 {
+    ios_t       ios[3];
     yuv_seq_t   seq[3];     /* src1,src2,diff */
     int         blksz;
     int     frame_range[2];
