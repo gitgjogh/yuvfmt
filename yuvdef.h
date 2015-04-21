@@ -132,12 +132,14 @@ void swap_uv(uint8_t **u, uint8_t **v);
 int get_uv_width(yuv_seq_t *yuv);
 int get_uv_height(yuv_seq_t *yuv);
 
-void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, 
+void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt, 
                     int nbit, int nlsb, int btile, 
                     int stride, int io_size);
                     
-void set_yuv_prop_by_copy(yuv_seq_t *dst, yuv_seq_t *src);
+void set_yuv_prop_by_copy(yuv_seq_t *dst, int b_realloc, yuv_seq_t *src);
 void show_yuv_prop(yuv_seq_t *yuv);
+int  yuv_buf_realloc(yuv_seq_t *yuv, int buf_size);
+void yuv_buf_free(yuv_seq_t *yuv);
 
 
 #endif  // __YUVDEF_H__

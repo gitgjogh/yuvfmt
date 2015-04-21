@@ -166,7 +166,12 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
 
 int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
 {
-    return 0;
+    xinit(SLOG_L_ADD);
+    xbinds(SLOG_L_ADD, "cfg,cmdl");
+    set_yuv_prop(&cfg->seq[0], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->seq[1], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->seq[2], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    cfg->frame_range[1] = INT_MAX;
 }
 
 int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
@@ -181,17 +186,11 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     if (0 != strcmp(argv[1], "-i0") && 0 != strcmp(argv[1], "-i1") &&
-        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") )
+        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") &&
+        0 != strcmp(argv[1], "-x")  && 0 != strcmp(argv[1], "-xall"))
     {
         return -1;
     }
-    
-    /**
-     *  init options
-     */
-    set_yuv_prop(&cfg->seq[0], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    set_yuv_prop(&cfg->seq[1], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    cfg->frame_range[1] = INT_MAX;
 
     /**
      *  loop options
@@ -231,15 +230,22 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             return -1;
         } else
         if (0==strcmp(arg, "i0")) {
+            char *path;
             seq = &cfg->seq[0];
-            i = arg_parse_str(i, argc, argv, &cfg->ios[0].path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 0, path, "rb");
         } else
         if (0==strcmp(arg, "i1")) {
+            char *path;
             seq = &cfg->seq[1];
-            i = arg_parse_str(i, argc, argv, &cfg->ios[1].path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 1, path, "rb");
         } else
         if (0==strcmp(arg, "o") || 0==strcmp(arg, "diff")) {
-            i = arg_parse_str(i, argc, argv, &cfg->ios[2].path);
+            char *path;
+            seq = &cfg->seq[0];
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 2, path, "wb");
         } else
         if (0==strcmp(arg, "wxh")) {
             i = arg_parse_wxh(i, argc, argv, &yuv->width, &yuv->height);
@@ -319,8 +325,6 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
                 yuv->width, yuv->height);
         return -1;
     }
-    cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
-    cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
         
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
         xerr("@cmdl>> Invalid frame_range %d~%d\n", 
@@ -331,6 +335,13 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     if (!ios_open(cfg->ios, CMP_IOS_CNT, 0)) {
         ios_close(cfg->ios, CMP_IOS_CNT);
         return -1;
+    }
+    
+    cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
+    cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
+    for (i=0; i<3; ++i) {
+        set_yuv_prop_by_copy(&cfg->seq[i], &cfg->seq[i]);
+        xlog("@cfg> yuv#%s: ", i);  show_yuv_prop(&cfg->seq[i]);
     }
     
     LEAVE_FUNC;
@@ -372,37 +383,22 @@ int yuv_cmp(int argc, char **argv)
     memset(&cfg, 0, sizeof(cfg));
     r = cmp_arg_parse(&cfg, argc, argv);
     if (r < 0) {
+        xerr("cmp_arg_parse() failed\n");
         cmp_arg_help();
         return 1;
     }
     r = cmp_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        xlog("@yuv> src1 \n");  show_yuv_prop(&cfg.seq[0]);
-        xlog("@yuv> src2 \n");  show_yuv_prop(&cfg.seq[1]);
-        xlog("@yuv> diff \n");  show_yuv_prop(&cfg.seq[2]);
+        xerr("cmp_arg_check() failed\n");
         return 1;
     }
 
-    int w_align = bit_sat(6, cfg.seq[0].width);
-    int h_align = bit_sat(6, cfg.seq[0].height);
-    int nbyte   = 1 + (cfg.seq[0].nbit > 8 || cfg.seq[1].nbit > 8);
-    char* fm[3] = {"rb", "rb", "wb"};
-    
-    for (i=0; i<3; ++i) 
-    {
-        seq[i].buf_size = w_align * h_align * 3 * nbyte;
-        seq[i].pbuf = malloc(seq[i].buf_size);
-        if(!seq[i].pbuf) {
-            xerr("malloc seq[%d] fail\n", i);
-            return -1;
-        }
-    }
-    
-    set_yuv_prop(&seq[3], cfg.seq[0].width, cfg.seq[0].height, 
+    set_yuv_prop(&seq[3], 0, cfg.seq[0].width, cfg.seq[0].height, 
             get_spl_fmt(cfg.seq[0].yuvfmt), 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             TILE_0, 0, 0);
+    xlog("@cfg>> mid type: \n");  show_yuv_prop(&seq[3]);
 
     /*************************************************************************
      *                          frame loop
@@ -413,7 +409,7 @@ int yuv_cmp(int argc, char **argv)
 
         for (i=0; i<2; ++i) 
         {
-            set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
+            set_yuv_prop_by_copy(&seq[i], 1, &cfg.seq[i]);
             r=fseek(cfg.ios[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
                 xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
@@ -432,7 +428,7 @@ int yuv_cmp(int argc, char **argv)
             // get one buffer unused
             ptmp = (i==0) ? &seq[2] : 
                             (spl[0] == &seq[0] ? &seq[2] : &seq[0]);
-            set_yuv_prop_by_copy(ptmp, &seq[3]);
+            set_yuv_prop_by_copy(ptmp, 1, &seq[3]);
             spl[i] = yuv_cvt_frame(ptmp, &seq[i]);
         }
         if ( ios_feof(cfg.ios, 0) || ios_feof(cfg.ios, 1) ) {
@@ -445,7 +441,7 @@ int yuv_cmp(int argc, char **argv)
                 break;
             }
         }
-        set_yuv_prop_by_copy(ptmp, &seq[3]);
+        set_yuv_prop_by_copy(ptmp, 1, &seq[3]);
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
@@ -464,9 +460,8 @@ int yuv_cmp(int argc, char **argv)
     xlog("@seq>> PSNR = %.2llf\n", psnr);
     
     for (i=0; i<3; ++i) {
-        if (seq[i].pbuf)    free(seq[i].pbuf);
+        yuv_buf_free(&seq[i]);
     }
-    
     cmp_arg_close(&cfg);
     
     return !!stat[1].ssd;

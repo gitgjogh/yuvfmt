@@ -117,6 +117,7 @@ int xerr_head(const char *fmt, ...)
     int r = 0;
     va_list ap;
     va_start(ap, fmt);
+    r = fprintf(stderr, "@err>> ");
     r = vfprintf(stderr, fmt, ap);
     va_end(ap);
     return r;
