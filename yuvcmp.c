@@ -243,7 +243,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         } else
         if (0==strcmp(arg, "o") || 0==strcmp(arg, "diff")) {
             char *path;
-            seq = &cfg->seq[0];
+            seq = &cfg->seq[2];
             i = arg_parse_str(i, argc, argv, &path);
             ios_cfg(cfg->ios, 2, path, "wb");
         } else
@@ -284,6 +284,27 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         } else
         if (0==strcmp(arg, "blksz")) {
             i = arg_parse_range(i, argc, argv, &cfg->blksz);
+        } else
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_L_NON);
+        } else
+        if (0==strcmp(arg, "xkey")) {
+            ++i;    xlevel(SLOG_L_KEY);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_L_ALL);
+        } else
+        if (0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
+        if (0==strcmp(arg, "xadd") || 0==strcmp(arg, "x")) {
+            char *keyset = 0;
+            i = arg_parse_str(i, argc, argv, &keyset);
+            if (i>0) {
+                xbinds(SLOG_L_KEY, keyset);
+            }
         } else
         {
             xerr("@cmdl>> invalid opt `%s`\n", arg);
@@ -340,8 +361,8 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
     cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
     for (i=0; i<3; ++i) {
-        set_yuv_prop_by_copy(&cfg->seq[i], &cfg->seq[i]);
-        xlog("@cfg> yuv#%s: ", i);  show_yuv_prop(&cfg->seq[i]);
+        set_yuv_prop_by_copy(&cfg->seq[i], 0, &cfg->seq[i]);
+        xlog("@cfg> yuv#%d: ", i);  show_yuv_prop(&cfg->seq[i]);
     }
     
     LEAVE_FUNC;
@@ -381,6 +402,8 @@ int yuv_cmp(int argc, char **argv)
     
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
+    cmp_arg_init (&cfg, argc, argv);
+    
     r = cmp_arg_parse(&cfg, argc, argv);
     if (r < 0) {
         xerr("cmp_arg_parse() failed\n");
