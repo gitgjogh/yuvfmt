@@ -43,7 +43,7 @@ dstat_t b8_rect_diff(int w, int h, uint8_t *base[3],
         uint8_t *base0 = base[0] + j * stride[0];
         uint8_t *base1 = base[1] + j * stride[1];
         uint8_t *base2 = base[2] + j * stride[2];
-        for (i=0; i<w; i+=8) {
+        for (i=0; i<w; ++i) {
             d = (int)(*base0++) - (int)(*base1++);
             d = d>0 ? d : -d;
             (*base2++) = (uint8_t)d;
@@ -57,7 +57,6 @@ dstat_t b8_rect_diff(int w, int h, uint8_t *base[3],
         stat->sad += st.sad;
         stat->ssd += st.ssd;
     }
-    
     return st;
 }
 
@@ -70,7 +69,7 @@ dstat_t b16_rect_diff(int w, int h, uint8_t *base[3],
         uint16_t *base0 = (uint16_t *)(base[0] + j * stride[0]);
         uint16_t *base1 = (uint16_t *)(base[1] + j * stride[1]);
         uint16_t *base2 = (uint16_t *)(base[2] + j * stride[2]);
-        for (i=0; i<w; i+=8) {
+        for (i=0; i<w; ++i) {
             d = (int)(*base0++) - (int)(*base1++);
             d = d>0 ? d : -d;
             (*base2++) = (uint16_t)d;
