@@ -484,7 +484,6 @@ int yuv_cmp(int argc, char **argv)
     xlog("@seq>> PSNR = %.2llf\n", psnr);
     
     cmp_arg_close(&cfg);
-    
     for (i=0; i<3; ++i) {
         yuv_buf_free(&seq[i]);
     }

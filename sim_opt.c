@@ -56,7 +56,7 @@ int ios_open(ios_t *ios, int nch, int *nop)
         if (f->b_used) {
             f->fp = fopen(f->path, f->mode);
             if( f->fp ){
-                xlog("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
+                xlog("@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", ch, f->fp, f->path, f->mode);
                 ++ j;
             } else {
                 xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
@@ -74,7 +74,7 @@ int ios_close(ios_t *ios, int nch)
     for (ch=j=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used && f->fp) {
-            xlog("@ios>> ch#%d fclose(%s)\n", ch, f->path);
+            xlog("@ios>> ch#%d fclose(0x%08x: %s)\n", ch, f->fp, f->path);
             fclose(f->fp);
             f->fp = 0;
             ++ j;

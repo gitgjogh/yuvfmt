@@ -1138,10 +1138,10 @@ int yuv_cvt(int argc, char **argv)
         xlog("@frm> #%d -\n", i);
     } // end frame loop
     
+    cvt_arg_close(&cfg);
     for (i=0; i<2; ++i) {
         yuv_buf_free(&seq[i]);
     }
-    cvt_arg_close(&cfg);
 
     return 0;
 }

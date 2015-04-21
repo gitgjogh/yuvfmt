@@ -229,9 +229,9 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
     if (new_buf) {
         yuv->pbuf = new_buf;
         yuv->buf_size = buf_size;
-        xlog("@buf>> yuv_buf_realloc()\n");
+        xlog("@buf>> yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
     } else {
-        xerr("@buf>> yuv_buf_malloc() failed\n");
+        xerr("@buf>> yuv_buf_malloc(%d) failed\n", buf_size);
     }
     return yuv->buf_size;   
 }
@@ -239,6 +239,7 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
 void yuv_buf_free(yuv_seq_t *yuv)
 {
     if (yuv && yuv->pbuf) {
+        xlog("@buf>> yuv_buf_free() = 0x%08x\n", yuv->pbuf);
         free(yuv->pbuf);
         yuv->pbuf = 0;
         yuv->buf_size = 0;
