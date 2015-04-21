@@ -744,7 +744,9 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     /**
      * fmt convertion.
      */        
-    if (cfg_src.yuvfmt != cfg_dst.yuvfmt) 
+    if (cfg_src.yuvfmt  != cfg_dst.yuvfmt   || 
+        pdst->y_stride  != cfg_dst.y_stride || 
+        pdst->io_size   != cfg_dst.io_size  )
     {
         int nbit = pdst->nbit;
         int nlsb = pdst->nlsb;
@@ -769,19 +771,26 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         }
         
         // uv re-sample
-        if (get_spl_fmt(cfg_src.yuvfmt) != get_spl_fmt(cfg_dst.yuvfmt))
+        if (pdst->yuvfmt    != get_spl_fmt(cfg_dst.yuvfmt) ||
+            pdst->y_stride  != cfg_dst.y_stride || 
+            pdst->io_size   != cfg_dst.io_size  )
         {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
+                    get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 
+                    cfg_dst.y_stride, cfg_dst.io_size);
             mch_p2p(psrc, pdst); 
         }
 
         // uv interlace
-        if (cfg_dst.yuvfmt != get_spl_fmt(cfg_dst.yuvfmt)) {
+        if (pdst->yuvfmt    != cfg_dst.yuvfmt   || 
+            pdst->y_stride  != cfg_dst.y_stride || 
+            pdst->io_size   != cfg_dst.io_size   ) 
+        {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, nbit, nlsb, TILE_0, 0, 0);
+                    cfg_dst.yuvfmt, nbit, nlsb, TILE_0, 
+                    cfg_dst.y_stride, cfg_dst.io_size);
             if (is_semi_planar(cfg_dst.yuvfmt)) {
                 mch_sp2p(pdst, psrc, INTERLACING);
             } else if (cfg_dst.yuvfmt == YUVFMT_UYVY  || cfg_dst.yuvfmt == YUVFMT_YUYV ) {
@@ -798,11 +807,13 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         SWAP_SRC_DST();
         if (cfg_dst.btile) {
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_1, 0, 0);
+                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_1, 
+                    cfg_dst.y_stride, cfg_dst.io_size);
             b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
         } else {
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_0, 0, 0);
+                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_0, 
+                    cfg_dst.y_stride, cfg_dst.io_size);
             b10_rect_unpack_mch(pdst, psrc, B16_2_B10);
         }
     }

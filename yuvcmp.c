@@ -433,7 +433,7 @@ int yuv_cmp(int argc, char **argv)
         for (i=0; i<2; ++i) 
         {
             set_yuv_prop_by_copy(&seq[i], 1, &cfg.seq[i]);
-            r=fseek(cfg.ios[i].fp, seq[i].io_size * j, SEEK_SET);
+            r = fseek(cfg.ios[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
                 xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
                 return -1;
@@ -471,7 +471,9 @@ int yuv_cmp(int argc, char **argv)
         xlog("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.ios[2].fp) {
-            r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.ios[2].fp);
+            set_yuv_prop_by_copy(spl[0], 1, &cfg.seq[2]);
+            yuv_seq_t* diff = yuv_cvt_frame(spl[0], ptmp);
+            r = fwrite(diff->pbuf, diff->io_size, 1, cfg.ios[2].fp);
             if (r<1) {
                 xerr("error writing file\n");
                 break;
@@ -482,10 +484,11 @@ int yuv_cmp(int argc, char **argv)
     psnr = get_stat_psnr(&stat[1]);
     xlog("@seq>> PSNR = %.2llf\n", psnr);
     
+    cmp_arg_close(&cfg);
+    
     for (i=0; i<3; ++i) {
         yuv_buf_free(&seq[i]);
     }
-    cmp_arg_close(&cfg);
     
     return !!stat[1].ssd;
 }
