@@ -67,6 +67,12 @@ slog_node_t* slog_touch_node(slog_t* kl, const char *key, uint32_t key_len,
                         int b_insert, int *b_found);
 slog_node_t* slog_get_node(slog_t *kl, const char *key, uint32_t keylen);
 slog_node_t* slog_bind(slog_t *kl, const char *key, uint32_t keylen, int level);
+
+
+uint32_t get_token_pos(const char* str, uint32_t search_from,
+                       const char* prejumpset,
+                       const char* delemiters,
+                       uint32_t *stoken_start);
 int     slog_binds(slog_t *kl, int level, const char *groups);
 
 int     slogv_head(slog_t *kl, const char *fmt, va_list ap);
