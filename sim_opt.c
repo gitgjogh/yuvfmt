@@ -90,10 +90,10 @@ int ios_feof(ios_t *p, int ich)
 
 char *get_argv(int argc, char *argv[], int i, const char *name)
 {
-    int s = i<argc ? argv[i][0] : 0;
+    int s = (argv && i<argc) ? argv[i][0] : 0;
     char *arg = (s != 0 && s != '-') ? argv[i] : 0;
     if (name) {
-        xlog("@cmdl>> get_argv[%s]=%s\n", name, arg?arg:"");
+        xlog("@cmdl.dbg>> -%s[%d] = `%s'\n", name+1, i, arg?arg:"nil");
     }
     return arg;
 }
@@ -195,24 +195,26 @@ int arg_parse_xkey(int i, int argc, char *argv[], slog_t *kl)
 
 char* cmdl_typestr(int type)
 {
-    return (type == OPT_T_INTI || type == OPT_T_INTX) ? "d" : 
-           ((type == OPT_T_STR || type == OPT_T_STRCPY) ? "s" : "?");
+    return ((type == OPT_T_INTI || type == OPT_T_INTX) ? "d" : 
+           ((type == OPT_T_BOOL) ? "b" :
+           ((type == OPT_T_STR || type == OPT_T_STRCPY) ? "s" : "?")));
 } 
 
-int cmdl_str2val(opt_desc_t *opt, int i_arg, const char *arg) 
+int cmdl_str2val(opt_desc_t *opt, int i_arg, char *arg) 
 {
-    void *pval = opt->pval + i_arg;
+    void *pval = opt->pval;
     switch(opt->type) 
     {
+    case OPT_T_BOOL:
     case OPT_T_INTI:
     case OPT_T_INTX:
-        *((int *)pval) = atoi(arg);
+        ((int *)pval)[i_arg] = atoi(arg);
         break;
     case OPT_T_STR:
-        *((const char **)pval) = arg;
+        ((char **)pval)[i_arg] = arg;
         break;
     case OPT_T_STRCPY:
-        strcpy(*(char **)pval, arg);
+        strcpy(((char **)pval)[i_arg], arg);
         break;
     default:
         xerr("not support opt type (%d)\n", opt->type);
@@ -223,18 +225,21 @@ int cmdl_str2val(opt_desc_t *opt, int i_arg, const char *arg)
 
 int cmdl_val2str(opt_desc_t *opt, int i_arg) 
 {
-    void *pval = opt->pval + i_arg;
+    char *str = 0;
+    void *pval = opt->pval;
     switch(opt->type) 
     {
+    case OPT_T_BOOL:
     case OPT_T_INTI:
-        printf("%d", *((int *)pval));
+        printf("%d", ((int *)pval)[i_arg] );
         break;
     case OPT_T_INTX:
-        printf("0x%08x", *((int *)pval));
+        printf("0x%08x", ((int *)pval)[i_arg] );
         break;
     case OPT_T_STR:
     case OPT_T_STRCPY:
-        printf("%s", *((char **)pval));
+        str = ((char **)pval)[i_arg] ;
+        printf("%s", str ? str : "?");
         break;
     default:
         xerr("not support opt type (%d)\n", opt->type);
@@ -314,32 +319,6 @@ int cmdl_enum_usable(opt_desc_t *opt)
     return 0;
 }
 
-int cmdl_help(int optc, opt_desc_t optv[])
-{
-    int i, j;
-    for (i=0; i<optc; ++i) 
-    {
-        opt_desc_t *opt = &optv[i];
-        printf("-%s, <%s>{%d}, ?%s, *%s", 
-                opt->name, 
-                cmdl_typestr(opt->type), 
-                opt->narg,
-                opt->help, 
-                opt->default_val);
-
-        for (j=0; j<opt->nref; ++j ) {
-            opt_ref_t *r = &opt->refs[j];
-            printf("\t &%s \t %s\n", r->name, r->val);
-        }
-        for (j=0; j<opt->nenum; ++j ) {
-            opt_enum_t *e = &opt->enums[j];
-            printf("\t &%s \t %d\n", e->name, e->val);
-        }
-        
-    }
-    return 0;
-}
-
 int cmdl_strspl(char *record, char *fieldArr[], int arrSz)
 {
     int nkey=0, keylen=0, pos=0;
@@ -356,109 +335,257 @@ int cmdl_strspl(char *record, char *fieldArr[], int arrSz)
     return nkey;
 }
 
-int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
+int cmdl_get_optdesc(int optc, opt_desc_t optv[], const char *name)
 {
-    int i_opt;
-    if (i>argc-1) {
-        return -i;
+    int i;
+    for (i=0; i<optc; ++i) {
+        if (0==strcmp(name, optv[i].name+1)) {
+            return i;
+        }
     }
-    const char *cur_opt = argv[i];
-    for (i_opt=0; i_opt<optc; ++i_opt) 
-    {
+    return -1;
+}
+
+int cmdl_set_ref(int optc, opt_desc_t optv[], 
+                const char *name, int nref, opt_ref_t *refs)
+{
+    int i_opt = cmdl_get_optdesc(optc, optv, name);
+    if (i_opt >= 0) {
         opt_desc_t *opt = &optv[i_opt];
-        cur_opt += 1;
-        if (0==strcmp(cur_opt, opt->name)) 
-        {
-            int   left = argc - (++i);
-            char **args = &argv[i];
-            char *arg  = get_argv(argc, argv, i, cur_opt);
-            int   need = max(opt->narg, 1);
-            
-            int  i_ref = -1;
-            char *spl[256] = {0};
-            char splbuf[1024] = {0};
-            
-            if (arg == 0 && opt->narg == 0) {
-                arg  = opt->default_val;
-                left = 1;
-                args = &arg;
-            }
-            
-            if (arg == 0) {
-                xerr("no arg for %s\n", cur_opt);
+        opt->nref = nref;
+        opt->refs = refs;
+    }
+    return i_opt;
+}
+
+int cmdl_set_enum(int optc, opt_desc_t optv[], 
+                const char *name, int nenum, opt_enum_t *enums)
+{
+    int i_opt = cmdl_get_optdesc(optc, optv, name);
+    if (i_opt >= 0) {
+        opt_desc_t *opt = &optv[i_opt];
+        opt->nenum = nenum;
+        opt->enums = enums;
+    }
+    return i_opt;
+}
+
+
+int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt)
+{
+    //xlog("@cmdl>> -%s : cmdl_get_optargs(%d, %d, %s...)\n", 
+    //    opt->name, i, argc, argv ? argv[i] : "?");
+    int j;
+    int    arg_count = argc - i;
+    char **arg_array = &argv[i];
+    char  *arg = get_argv(argc, argv, i, opt->name);
+    
+    if ((argv == 0) || (arg == 0 && opt->type == OPT_T_BOOL)) {
+        opt->b_default = 1;
+        arg  = opt->default_val;
+        arg_count = 1;
+        arg_array = &arg;
+        xlog("@cmdl.dbg>> use default_val `%s'\n", arg ? arg : "nil");
+    } 
+    
+    if (arg == 0) {
+        xerr("no arg for -%s\n", opt->name);
+        return i ? -i : -1;
+    }
+    
+    char *spl[256] = {0};
+    char splbuf[1024] = {0};
+    if (arg[0] == '&') 
+    {
+        if (opt->nref > 0) {
+            opt->i_ref = ref_name_2_idx(opt->nref, opt->refs, &arg[1]);
+            if (opt->i_ref < 0) {
+                xerr("can't find -%s.%s as ref\n", opt->name, arg);
                 return -i;
             }
             
-            char *refstr = 0;
-            if (arg[0] == '&') 
-            {
-                if (opt->nref) {
-                    i_ref = ref_name_2_idx(opt->nref, opt->refs, &arg[1]);
-                    if (i_ref < 0) {
-                        xerr("can't find -%s.%s as ref\n", cur_opt, arg);
-                        return -i;
-                    }
-                    
-                    strncpy(splbuf, opt->refs[i_ref].val, 1024);
-                    left = cmdl_strspl(splbuf, spl, 256);
-                    if (left>=256) {
-                        xerr("strspl() overflow\n");
-                        return -i;
-                    }
-                    args = spl;
-                } else if ( cmdl_enum_usable( opt ) ) {
-                    int i_enum = enum_name_2_idx(opt->nenum, opt->enums, &arg[1]);
-                    if (i_enum < 0) {
-                        xerr("can't find -%s.%s as enum\n", cur_opt, arg);
-                        return -i;
-                    }
-                    *((int *)opt->pval) = opt->enums[i_ref].val;
-                    return ++i;
-                } else {
-                    xerr("can't expand -%s.%s neither as ref nor enum\n", cur_opt, arg);
-                    return -i;
-                }
+            strncpy(splbuf, opt->refs[opt->i_ref].val, 1024);
+            arg_count = cmdl_strspl(splbuf, spl, 256);
+            if (arg_count>=256) {
+                xerr("strspl() overflow\n");
+                return -i;
             }
             
-            int i_arg;
-            for (i_arg=0; i_arg<left; ++i_arg) {
-                char *arg = get_argv(left, args, i_arg, cur_opt);
-                if (!arg) {
-                    xerr("%s no more args for %s\n", refstr ? arg : "", cur_opt);
-                    return -i - (refstr ? 1 : i_arg);
-                } else {
-                    cmdl_str2val(opt, i_arg, arg);
-                }
+            arg_array = spl;
+        } else if ( cmdl_enum_usable( opt ) ) {
+            opt->i_enum = enum_name_2_idx(opt->nenum, opt->enums, &arg[1]);
+            if (opt->i_enum < 0) {
+                xerr("can't find -%s.%s as enum\n", opt->name, arg);
+                return -i;
             }
-            
-            return i + (refstr ? 1 : i_arg);
+            *((int *)opt->pval) = opt->enums[opt->i_enum].val;
+            return i + !opt->b_default;
+        } else {
+            xerr("can't expand -%s.%s neither as ref nor enum\n", opt->name, arg);
+            return -i;
+        }
+    }
+    //TODO: bug here
+    int i_arg;
+    for (i_arg=0; i_arg<opt->narg; ++i_arg) {
+        arg = get_argv(arg_count, arg_array, i_arg, opt->name);
+        if (!arg) {
+            xerr("%s no more args for %s\n", opt->i_ref >= 0 ? arg : "", opt->name);
+            return -(i + opt->b_default ? 0 : (opt->i_ref >= 0 ? 1 : i_arg));
+        } else {
+            cmdl_str2val(opt, i_arg, arg);
         }
     }
     
-    return -i;
+    int narg = opt->b_default ? 0 : (opt->i_ref >= 0 ? 1 : i_arg);
+    return i + narg;
+}
+
+int cmdl_init(int optc, opt_desc_t optv[])
+{
+    int i;
+    for (i=0; i<optc; ++i) 
+    {
+        opt_desc_t *opt = &optv[i];
+        opt->i_ref = opt->i_enum = -1;
+    }
+    return 0;
+}
+
+int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
+{
+    ENTER_FUNC;
+    
+    if (i>=argc) {
+        return -i;
+    }
+     
+    for (i=1; i>=0 && i<argc; )
+    {
+        char *cmdl_opt = argv[i];
+        if (cmdl_opt[0]!='-') {
+            xerr("@cmdl>> argv[%d] (%s) is not opt\n", i, cmdl_opt);
+            return -i;
+        }
+        
+        int i_opt = cmdl_get_optdesc(optc, optv, cmdl_opt+1);
+        if (i_opt < 0) {
+            xerr("no option `%s` defined\n", cmdl_opt);
+            return -i;
+        }
+        
+        ++ optv[i_opt].n_parse;
+        optv[i_opt].argvIdx = i++;
+        i = cmdl_get_optargs(i, argc, argv, &optv[i_opt]);
+        if (i <= optv[i_opt].argvIdx) {
+            xerr("%d = cmdl_get_optargs(%d, %d, %s...)\n", i, optv[i_opt].argvIdx+1, argc, argv[i]);
+            return - optv[i_opt].argvIdx;
+        }
+    }
+    
+    LEAVE_FUNC;
+    
+    return i;
+}
+
+int cmdl_help(int optc, opt_desc_t optv[])
+{
+    int i, j;
+    
+    ENTER_FUNC;
+    
+    printf("help = {\n");
+    
+    for (i=0; i<optc; ++i) 
+    {
+        opt_desc_t *opt = &optv[i];
+        printf("    -%s (%c), %%%s{%d}, help='%s', default='%s';\n", 
+                opt->name + 1, opt->name[0],
+                cmdl_typestr(opt->type), 
+                opt->narg, 
+                opt->help, 
+                opt->default_val ? opt->default_val : "" );
+
+        for (j=0; j<opt->nref; ++j ) {
+            opt_ref_t *r = &opt->refs[j];
+            printf("\t &%-10s \t `%s'\n", r->name, r->val);
+        }
+        for (j=0; j<opt->nenum; ++j ) {
+            opt_enum_t *e = &opt->enums[j];
+            printf("\t &%-10s \t %d\n", e->name, e->val);
+        }
+    }
+    
+    printf("};\n");
+    
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+int cmdl_check(int optc, opt_desc_t optv[])
+{
+    int n_err = 0;
+    int i_opt, i_arg;
+    
+    ENTER_FUNC;
+    
+    for (i_opt=0; i_opt<optc; ++i_opt) 
+    {
+        opt_desc_t *opt = &optv[i_opt];
+        if (opt->n_parse > 0) {
+            continue;
+        }
+        //xlog("@cmdl>> -%-10s hasn't given at cmdl\n", &opt->name[1]);
+        if (opt->name[0] == '+') {
+            xerr("%s not specified\n", &opt->name[1]);
+            -- n_err;
+        } else {
+            xlog("@cmdl>> try default_val for -%s\n", &opt->name[1]);
+            int r = cmdl_get_optargs(0, 0, 0, opt);
+            if (r < 0) {
+                xerr("%s fail to use default_val\n", &opt->name[1]);
+                -- n_err;
+            } 
+        }
+    }
+    
+    LEAVE_FUNC;
+    
+    return n_err;
 }
 
 int cmdl_result(int optc, opt_desc_t optv[])
 {
     int i_opt, i_arg;
+    
+    ENTER_FUNC;
+    
+    printf("result = {\n");
     for (i_opt=0; i_opt<optc; ++i_opt) 
     {
         opt_desc_t *opt = &optv[i_opt];
-        printf("-%s={", opt->name);
+        printf("\t-%s (%c%d) = `", opt->name+1, opt->name[0], opt->n_parse);
         int narg = max(opt->narg, 1);
         for (i_arg=0; i_arg<narg; ++i_arg) {
             cmdl_val2str(opt, i_arg);
-            printf(",");
+            printf("%c", (i_arg==narg-1) ? '\'' : ' ');
         }
         
-        if ( cmdl_enum_usable(opt) ) {
-            int val = *((int *)opt->pval);
-            const char *name = enum_val_2_name(opt->nenum, opt->enums, val);
-            if (name) {
-                printf("(&%s)", name);
-            }
+        //printf("\t ref[#%d]=", opt->i_ref);
+        if (opt->i_ref >= 0 && opt->i_ref < opt->nref) {
+            printf(" (&%s)", opt->refs[opt->i_ref].name);
         }
-        printf("}\n");
+        
+        //printf("enum[#%d]=", opt->i_enum);
+        if (opt->i_enum >= 0 && opt->i_enum < opt->nenum) {
+            printf(" (&%s)", opt->enums[opt->i_enum].name);
+        }
+        printf("; \n");
     }
+    printf("}; \n");
+    
+    LEAVE_FUNC;
+    
     return 0;
 }

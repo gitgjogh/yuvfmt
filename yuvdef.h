@@ -39,7 +39,7 @@
 
 static int fcall_layer = 0;
 #define ENTER_FUNC  xlog("@+++> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
-#define LEAVE_FUNC  xlog("@---> %-2d: %s(-)\n", --fcall_layer, __FUNCTION__)
+#define LEAVE_FUNC  xlog("@---> %-2d: %s(-)\n\n", --fcall_layer, __FUNCTION__)
 
 
 typedef union _i64_pack {
@@ -95,6 +95,7 @@ typedef struct _yuv_seq
 {
     int     width;
     int     height;
+    int     wxh[2];
     int     yuvfmt;
     int     nbit;
     int     nlsb;

@@ -19,6 +19,7 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
+#include "yuvfmt.h"
 
 int main(int argc, char **argv)
 {
@@ -28,12 +29,12 @@ int main(int argc, char **argv)
     typedef struct yuv_module {
         const char *name; 
         int (*func)(int argc, char **argv);
-        int (*help)();
     } yuv_module_t;
     
     const static yuv_module_t sub_main[] = {
-        {"cvt",     yuv_cvt,    cvt_arg_help},
-        {"cmp",     yuv_cmp,    cmp_arg_help},
+        {"cvt",     yuv_cvt},
+        {"cmp",     yuv_cmp},
+        {"fmt",     yuv_fmt},
     };
     
     if (argc<2) {

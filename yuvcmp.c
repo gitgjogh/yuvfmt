@@ -216,7 +216,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         
         for (j=0; j<n_cmn_fmt; ++j) {
             if (0==strcmp(arg, cmn_fmt[j].name)) {
-                seq->yuvfmt = cmn_fmt[j].ifmt;
+                seq->yuvfmt = cmn_fmt[j].val;
                 break;
             }
         }

@@ -47,14 +47,9 @@ typedef struct resolution {
     int         w, h;
 } res_t;
 
-typedef struct yuvformat {
-    const char *name; 
-    int         ifmt;
-} fmt_t;
-
 extern const res_t cmn_res[];
 extern const int n_cmn_res;
-extern const fmt_t cmn_fmt[];
+extern const opt_enum_t cmn_fmt[];
 extern const int n_cmn_fmt;
 const char* show_fmt(int ifmt);
 int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph);

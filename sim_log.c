@@ -24,8 +24,14 @@
 
 slog_printf_t   xlog    =   printf;
 slog_printf_t   xlog__  =   printf;
+
+#ifdef _XLOG_
+slog_printf_t   xerr    =   xerr_head;
+slog_printf_t   xerr__  =   xerr_tail;
+#else
 slog_printf_t   xerr    =   printf;
 slog_printf_t   xerr__  =   printf;
+#endif
 
 #ifdef _XLOG_
 static slog_head_t xlog_hash_tbl[XLOG_HASH_TBLSZ] = {};
