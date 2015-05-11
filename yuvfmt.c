@@ -65,10 +65,10 @@ int yuv_fmt(int argc, char **argv)
         { "*wxh",    OPT_T_INTI, 2, yuv->wxh,     "&qcif", "w & h", n_cmn_wxh, 0, cmn_wxh},
         { "*nbit",   OPT_T_INTI, 1, &yuv->nbit,   "8",  ""},
         { "*nlsb",   OPT_T_INTI, 1, &yuv->nlsb,   "8",  ""},
-        { "*btile",  OPT_T_BOOL, 0, &yuv->btile,  "1",  ""},
-        { "*stride", OPT_T_INTI, 1, &yuv->y_stride,   "0", ""},
-        { "*iosize", OPT_T_INTI, 1, &yuv->io_size,    "0", ""},
-        { "*frange", OPT_T_INTI, 2, cfg->frame_range, "0", ""},
+        { "*btile",  OPT_T_BOOL, 1, &yuv->btile,      0, ""},
+        { "*stride", OPT_T_INTI, 1, &yuv->y_stride,   0, ""},
+        { "*iosize", OPT_T_INTI, 1, &yuv->io_size,    0, ""},
+        { "*frange", OPT_T_INTI, 2, cfg->frame_range, 0, ""},
     };
     const int n_fmt_opt = ARRAY_SIZE(fmt_opt);
     
@@ -76,7 +76,12 @@ int yuv_fmt(int argc, char **argv)
     
     r = cmdl_help(n_fmt_opt, fmt_opt);
     
-    cmdl_init(n_fmt_opt, fmt_opt);
+    r = cmdl_init(n_fmt_opt, fmt_opt);
+    if (r < 0) {
+        xerr("invalid cmdl description defined (%d)\n\n", r);
+        return 1;
+    }
+    
     r = cmdl_parse(1, argc, argv, n_fmt_opt, fmt_opt);
     if (r < 0) {
         xerr("fmt_arg_parse() failed (%d)\n\n", r);

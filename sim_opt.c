@@ -200,9 +200,33 @@ char* cmdl_typestr(int type)
            ((type == OPT_T_STR || type == OPT_T_STRCPY) ? "s" : "?")));
 } 
 
+int cmdl_try_default(opt_desc_t *opt, int i_arg) 
+{
+    void *pval = opt->pval;
+    if (!pval) {
+        return 0;
+    }
+    
+    switch(opt->type) 
+    {
+    case OPT_T_BOOL:
+        ((int *)pval)[i_arg] = 1;
+        return 1;
+    case OPT_T_INTI:
+    case OPT_T_INTX:
+        ((int *)pval)[i_arg] = 0;
+        return 1;
+    }
+    return 0;
+}
+
 int cmdl_str2val(opt_desc_t *opt, int i_arg, char *arg) 
 {
     void *pval = opt->pval;
+    if (!pval) {
+        return 0;
+    }
+    
     switch(opt->type) 
     {
     case OPT_T_BOOL:
@@ -225,27 +249,33 @@ int cmdl_str2val(opt_desc_t *opt, int i_arg, char *arg)
 
 int cmdl_val2str(opt_desc_t *opt, int i_arg) 
 {
+    int r = 0;
     char *str = 0;
     void *pval = opt->pval;
+    if (!pval) {
+        printf("?");
+        return 0;
+    }
+    
     switch(opt->type) 
     {
     case OPT_T_BOOL:
     case OPT_T_INTI:
-        printf("%d", ((int *)pval)[i_arg] );
+        r = printf("%d", ((int *)pval)[i_arg] );
         break;
     case OPT_T_INTX:
-        printf("0x%08x", ((int *)pval)[i_arg] );
+        r = printf("0x%08x", ((int *)pval)[i_arg] );
         break;
     case OPT_T_STR:
     case OPT_T_STRCPY:
         str = ((char **)pval)[i_arg] ;
-        printf("%s", str ? str : "?");
+        r = printf("%s", str ? str : "?");
         break;
     default:
         xerr("not support opt type (%d)\n", opt->type);
         return -1;
     }
-    return 0;
+    return r;
 }
 
 int ref_name_2_idx(int nref, opt_ref_t *refs, const char *name)
@@ -378,24 +408,21 @@ int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt)
     int j;
     int    arg_count = argc - i;
     char **arg_array = &argv[i];
-    char  *arg = get_argv(argc, argv, i, opt->name);
+    char  *arg = 0;
     
-    if ((argv == 0) || (arg == 0 && opt->type == OPT_T_BOOL)) {
+    if (argv == 0) {
         opt->b_default = 1;
-        arg  = opt->default_val;
-        arg_count = 1;
+        arg = opt->default_val;
+        arg_count = arg ? 1 : 0;
         arg_array = &arg;
         xlog("@cmdl.dbg>> use default_val `%s'\n", arg ? arg : "nil");
-    } 
-    
-    if (arg == 0) {
-        xerr("no arg for -%s\n", opt->name);
-        return i ? -i : -1;
+    } else {
+        arg = get_argv(argc, argv, i, opt->name);
     }
     
     char *spl[256] = {0};
     char splbuf[1024] = {0};
-    if (arg[0] == '&') 
+    if (arg && arg[0] == '&') 
     {
         if (opt->nref > 0) {
             opt->i_ref = ref_name_2_idx(opt->nref, opt->refs, &arg[1]);
@@ -429,11 +456,11 @@ int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt)
     int i_arg;
     for (i_arg=0; i_arg<opt->narg; ++i_arg) {
         arg = get_argv(arg_count, arg_array, i_arg, opt->name);
-        if (!arg) {
+        if (arg) {
+            cmdl_str2val(opt, i_arg, arg);
+        } else if ( !cmdl_try_default(opt, i_arg) ) {
             xerr("%s no more args for %s\n", opt->i_ref >= 0 ? arg : "", opt->name);
             return -(i + opt->b_default ? 0 : (opt->i_ref >= 0 ? 1 : i_arg));
-        } else {
-            cmdl_str2val(opt, i_arg, arg);
         }
     }
     
@@ -443,13 +470,26 @@ int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt)
 
 int cmdl_init(int optc, opt_desc_t optv[])
 {
+    int n_err = 0;
     int i;
     for (i=0; i<optc; ++i) 
     {
         opt_desc_t *opt = &optv[i];
         opt->i_ref = opt->i_enum = -1;
     }
-    return 0;
+    for (i=0; i<optc; ++i) 
+    {
+        opt_desc_t *opt = &optv[i];
+        if (!opt->name || (opt->name[0] != '*' && opt->name[0] != '+') ) {
+            xerr("invalide optiion name\n");
+            -- n_err;
+        }
+        if (opt->narg < 1) {
+            xerr("-%s.narg = %d is not allowed\n", opt->name + 1, opt->narg);
+            -- n_err;
+        }
+    }
+    return n_err;
 }
 
 int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
