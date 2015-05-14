@@ -48,24 +48,45 @@ int ios_nused(ios_t *ios, int nch)
     return j;   
 }
 
-int ios_open(ios_t *ios, int nch, int *nop)
+/**
+ *  @param [i] ios - array of io description
+ *  @param [o] nop - num of files truely opened
+ *  @return num of files failed to be opened
+ */
+int ios_open(ios_t ios[], int nch, int *nop)
 {
-    int ch, j, k;
-    for (ch=j=k; ch<nch; ++ch) {
+    int ch, j, n_err;
+    for (ch=j=n_err=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
-        if (f->b_used) {
+        if (f->b_used) 
+        {
+            if (strchr(f->mode, 'a') || strchr(f->mode, 'w') || strchr(f->mode, 'r')) 
+            {
+                FILE *fp = fopen(f->path, "r");
+                if (fp) {
+                    char yes_or_no = 0;
+                    fclose(fp); fp =0;
+                    printf("file `%s' already exist, overwrite? (y/n)\n", f->path);
+                    scanf("%c\n", &yes_or_no);
+                    if (yes_or_no != 'y') {
+                        printf("file `%s' would be skipped\n", f->path);
+                        continue;
+                    }
+                }
+            }
+            
             f->fp = fopen(f->path, f->mode);
-            if( f->fp ){
+            if ( f->fp ) {
                 xlog("@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", ch, f->fp, f->path, f->mode);
                 ++ j;
             } else {
                 xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
-                ++ k;
+                ++ n_err;
             }
         }
     }
     nop ? (*nop = j) : 0;
-    return (k==0);   
+    return (n_err==0);   
 }
 
 int ios_close(ios_t *ios, int nch)
