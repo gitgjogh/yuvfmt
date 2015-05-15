@@ -179,7 +179,7 @@ void b8_tile_2_mch(yuv_seq_t *tile, yuv_seq_t *rect, int b_t2r)
     uint8_t *pt = tile->pbuf;
     uint8_t *pl = rect->pbuf;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert (tile->nbit == 8);
     assert (rect->nbit == 8);
@@ -227,7 +227,7 @@ void b8_tile_2_mch(yuv_seq_t *tile, yuv_seq_t *rect, int b_t2r)
         b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return;
 }

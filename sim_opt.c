@@ -17,9 +17,127 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <stdio.h>
 
-#include "yuvdef.h"
 #include "sim_opt.h"
+
+static slog_t  g_slog_obj = { 0 };
+// static slog_t *g_slog_ptr = &g_slog_obj;
+
+int clip(int v, int minv, int maxv)
+{
+    v = (v<minv) ? minv : v;
+    v = (v>maxv) ? maxv : v;
+    return v;
+}
+
+#define CLIP(v, minv, maxv)     ((v) = clip((v), (minv), (maxv)))
+
+int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
+{
+    if (minL>=SLOG_NON && maxL<=SLOG_ALL && minL<=maxL) {
+        int level;
+        for (level = minL; level <= maxL; ++level) {
+            sl->fp[level] = fp;
+        }
+        return (maxL - minL + 1);
+    }
+    return 0;
+}
+
+int slog_init(slog_t *sl, int level)
+{
+    memset(sl, 0, sizeof(slog_t));
+    sl->b_inited = 1;
+    if (level != SLOG_NON) { 
+        sl->fp[SLOG_NON] = sl->fp[SLOG_ERR] = stderr;
+        return slog_set_range(sl, SLOG_ERR+1, level, stdout);
+    }
+    return 0;
+}
+
+void slog_reset(slog_t *sl)
+{
+    memset(sl, 0, sizeof(slog_t));
+}
+
+int xlog_set_range(int minL, int maxL, void *fp)
+{
+    return slog_set_range(&g_slog_obj, minL, maxL, fp);
+}
+
+int xlog_init(int level)
+{
+    return slog_init(&g_slog_obj, level);
+}
+
+void xlog_reset()
+{
+    slog_reset(&g_slog_obj);
+}
+
+int xlevel(int level)
+{
+    return slog_init(&g_slog_obj, level);
+}
+
+int slogv(slog_t *sl, int level, const char *prompt, const char *fmt, va_list ap)
+{
+    FILE *fp = 0;
+    if (sl->b_inited) {
+        level = clip(level, SLOG_NON, SLOG_ALL);
+        fp = sl->fp[level];
+    } else {
+        fp = (level <= SLOG_ERR) ? stderr : stdout;
+    }
+    
+    if (fp) {
+        if (prompt) {
+            fprintf(fp, "@%s>> ", prompt);
+        }
+        return vfprintf(fp, fmt, ap);
+    }
+
+    return 0;
+}
+
+int xlogv(int level, const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, level, 0, fmt, ap);
+}
+
+int xerrv(const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, SLOG_ERR, "err", fmt, ap);
+}
+
+int slog (slog_t *sl, int level, const char *prompt, const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = slogv(sl, level, prompt, fmt, ap);
+    va_end(ap);
+    return r;
+}
+int xlog (int level, const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xlogv(level, fmt, ap);
+    va_end(ap);
+    return r;
+}
+int xerr (const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xerrv(fmt, ap);
+    va_end(ap);
+    return r;
+}
 
 
 void iof_cfg(ios_t *f, const char *path, const char *mode)
@@ -60,14 +178,14 @@ int ios_open(ios_t ios[], int nch, int *nop)
         ios_t *f = &ios[ch];
         if (f->b_used) 
         {
-            if (strchr(f->mode, 'a') || strchr(f->mode, 'w') || strchr(f->mode, 'r')) 
+            if (strchr(f->mode, 'a') || strchr(f->mode, 'w') || strchr(f->mode, '+')) 
             {
                 FILE *fp = fopen(f->path, "r");
                 if (fp) {
                     char yes_or_no = 0;
                     fclose(fp); fp =0;
-                    printf("file `%s' already exist, overwrite? (y/n)\n", f->path);
-                    scanf("%c\n", &yes_or_no);
+                    printf("file `%s' already exist, overwrite? (y/n) : ", f->path);
+                    scanf("%c", &yes_or_no);
                     if (yes_or_no != 'y') {
                         printf("file `%s' would be skipped\n", f->path);
                         continue;
@@ -77,7 +195,8 @@ int ios_open(ios_t ios[], int nch, int *nop)
             
             f->fp = fopen(f->path, f->mode);
             if ( f->fp ) {
-                xlog("@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", ch, f->fp, f->path, f->mode);
+                xlog(SLOG_IOS, "@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", 
+                                        ch, f->fp, f->path, f->mode);
                 ++ j;
             } else {
                 xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
@@ -95,7 +214,7 @@ int ios_close(ios_t *ios, int nch)
     for (ch=j=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used && f->fp) {
-            xlog("@ios>> ch#%d fclose(0x%08x: %s)\n", ch, f->fp, f->path);
+            xlog(SLOG_IOS, "@ios>> ch#%d fclose(0x%08x: %s)\n", ch, f->fp, f->path);
             fclose(f->fp);
             f->fp = 0;
             ++ j;
@@ -114,7 +233,7 @@ char *get_argv(int argc, char *argv[], int i, const char *name)
     int s = (argv && i<argc) ? argv[i][0] : 0;
     char *arg = (s != 0 && s != '-') ? argv[i] : 0;
     if (name) {
-        xlog("@cmdl.dbg>> -%s[%d] = `%s'\n", name+1, i, arg?arg:"nil");
+        xlog(SLOG_CMDL, "@cmdl>> -%s[%d] = `%s'\n", SAFE_STR(name), i, SAFE_STR(arg));
     }
     return arg;
 }
@@ -155,14 +274,14 @@ int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
 
     /* get `~$last` or `+$count` */
     if (*flag != '~' && *flag != '+') {
-        xlog("@cmdl>> Err : Invalid flag\n");
+        xerr("@cmdl>> Err : Invalid flag\n");
         return -1;
     }
     
     //i_range[1] = strtoul (flag + 1, &last, 10);
     last = get_uint32 (flag + 1, &i_range[1]);
     if (last == 0 || *last != 0 ) {
-        xlog("@cmdl>> Err : Invalid count/end\n");
+        xerr("@cmdl>> Err : Invalid count/end\n");
         i_range[1] = INT_MAX;
         return -1;
     }
@@ -204,13 +323,6 @@ int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
 {
     char *arg = GET_ARGV(++ i, "int");
     *p = arg ? atoi(arg) : default_val;
-    return arg ? ++i : i;
-}
-
-int arg_parse_xkey(int i, int argc, char *argv[], slog_t *kl)
-{
-    const char *arg = GET_ARGV(++ i, "xkey");
-    arg ? slog_binds(kl ? kl : xlog_ptr, SLOG_L_ADD, arg) : 0;
     return arg ? ++i : i;
 }
 
@@ -370,6 +482,35 @@ int cmdl_enum_usable(opt_desc_t *opt)
     return 0;
 }
 
+uint32_t get_token_pos(const char* str, uint32_t search_from,
+                       const char* prejumpset,
+                       const char* delemiters,
+                       uint32_t *stoken_start)
+{
+    uint32_t c, start, end;
+
+    if (prejumpset) 
+    {
+        for (start = search_from; (c = str[start]); ++start) {
+            if ( !strchr(prejumpset, c) ) {
+                break;
+            }
+        }
+    }
+
+    if (stoken_start) {
+        *stoken_start = start;
+    }
+
+    for (end = start; (c = str[end]); ++end) {
+        if ( delemiters && strchr(delemiters, c) ) {
+            break;
+        }
+    }
+
+    return end - start;
+}
+                       
 int cmdl_strspl(char *record, char *fieldArr[], int arrSz)
 {
     int nkey=0, keylen=0, pos=0;
@@ -436,7 +577,7 @@ int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt)
         arg = opt->default_val;
         arg_count = arg ? 1 : 0;
         arg_array = &arg;
-        xlog("@cmdl.dbg>> use default_val `%s'\n", arg ? arg : "nil");
+        xlog(SLOG_CMDL, "@cmdl>> use default_val `%s'\n", arg ? arg : "nil");
     } else {
         arg = get_argv(argc, argv, i, opt->name);
     }
@@ -515,7 +656,7 @@ int cmdl_init(int optc, opt_desc_t optv[])
 
 int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
 {
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (i>=argc) {
         return -i;
@@ -544,7 +685,7 @@ int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return i;
 }
@@ -553,7 +694,7 @@ int cmdl_help(int optc, opt_desc_t optv[])
 {
     int i, j;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     printf("help = {\n");
     
@@ -579,7 +720,7 @@ int cmdl_help(int optc, opt_desc_t optv[])
     
     printf("};\n");
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -589,7 +730,7 @@ int cmdl_check(int optc, opt_desc_t optv[])
     int n_err = 0;
     int i_opt, i_arg;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     for (i_opt=0; i_opt<optc; ++i_opt) 
     {
@@ -602,7 +743,7 @@ int cmdl_check(int optc, opt_desc_t optv[])
             xerr("%s not specified\n", &opt->name[1]);
             -- n_err;
         } else {
-            xlog("@cmdl>> try default_val for -%s\n", &opt->name[1]);
+            xlog(SLOG_CMDL, "@cmdl>> try default_val for -%s\n", &opt->name[1]);
             int r = cmdl_get_optargs(0, 0, 0, opt);
             if (r < 0) {
                 xerr("%s fail to use default_val\n", &opt->name[1]);
@@ -611,7 +752,7 @@ int cmdl_check(int optc, opt_desc_t optv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return n_err;
 }
@@ -620,7 +761,7 @@ int cmdl_result(int optc, opt_desc_t optv[])
 {
     int i_opt, i_arg;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     printf("result = {\n");
     for (i_opt=0; i_opt<optc; ++i_opt) 
@@ -646,7 +787,7 @@ int cmdl_result(int optc, opt_desc_t optv[])
     }
     printf("}; \n");
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }

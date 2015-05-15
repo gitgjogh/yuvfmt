@@ -18,10 +18,10 @@
 #include <limits.h>
 #include <string.h>
 #include <malloc.h>
+#include <stdio.h>
 
 #include "yuvdef.h"
 #include "yuvcvt.h"
-#include "sim_opt.h"
 
 
 const res_t cmn_res[] = {
@@ -54,6 +54,11 @@ const opt_enum_t cmn_fmt[] = {
 
 const int n_cmn_res = ARRAY_SIZE(cmn_res);
 const int n_cmn_fmt = ARRAY_SIZE(cmn_fmt);
+
+const char* show_fmt(int ifmt)
+{
+    return enum_val_2_name(n_cmn_fmt, cmn_fmt, ifmt);
+}
 
 int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
 {
@@ -136,7 +141,7 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int h   = psrc->height; 
     int y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert((psrc->nbit==8 && pdst->nbit==8) || (psrc->nbit==16 && pdst->nbit==16));
     assert(is_mch_planar(src_fmt));
@@ -171,7 +176,7 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -195,7 +200,7 @@ int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==8 && spl->nbit==8);
     assert(is_semi_planar(itl->yuvfmt));
@@ -228,7 +233,7 @@ int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -249,7 +254,7 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==8 && spl->nbit==8);
     assert(is_mch_mixed(itl->yuvfmt));
@@ -299,7 +304,7 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }   /* end for y*/
 
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -328,7 +333,7 @@ int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==16 && spl->nbit==16);
     assert(is_semi_planar(itl->yuvfmt));
@@ -361,7 +366,7 @@ int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -382,7 +387,7 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==16 && spl->nbit==16);
     assert(is_mch_mixed(itl->yuvfmt));
@@ -432,7 +437,7 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }   /* end for y*/
 
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -481,7 +486,7 @@ int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int rshift = (pdst->nlsb > 0) ? (16 - pdst->nlsb) : 0;
     lshift -= rshift;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(psrc->nbit==16 && pdst->nbit==16);
     assert(psrc->nlsb!=0  && pdst->nlsb!=0 );
@@ -530,7 +535,7 @@ int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
         b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -614,7 +619,7 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
     int w   = rect16->width; 
     int h   = rect16->height; 
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert (rect16->nbit  == 16);
     assert (rect16->nlsb  >= 8);
@@ -664,7 +669,7 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
         b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return 0;
 }
@@ -680,7 +685,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     yuv_seq_t cfg_src, cfg_dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
 
     memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
     memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
@@ -832,15 +837,13 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         //TODO: 
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return pdst;
 }
 
 int cvt_arg_init (cvt_opt_t *cfg, int argc, char *argv[])
 {
-    xinit(SLOG_L_ADD);
-    xbinds(SLOG_L_ADD, "cfg,cmdl");
     set_yuv_prop(&cfg->src, 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
     set_yuv_prop(&cfg->dst, 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
     cfg->frame_range[1] = INT_MAX;
@@ -853,7 +856,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     yuv_seq_t *src = &cfg->src;
     yuv_seq_t *dst = &cfg->dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (argc<2) {
         return -1;
@@ -900,7 +903,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cvt_arg_help();
-            return -1;
+            return 0;
         } else
         if (0==strcmp(arg, "src")) {
             char *path = 0;
@@ -951,25 +954,15 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_int(i, argc, argv, &seq->io_size);
         } else
         if (0==strcmp(arg, "xnon")) {
-            ++i;    xlevel(SLOG_L_NON);
-        } else
-        if (0==strcmp(arg, "xkey")) {
-            ++i;    xlevel(SLOG_L_KEY);
+            ++i;    xlevel(SLOG_NON);
         } else
         if (0==strcmp(arg, "xall")) {
-            ++i;    xlevel(SLOG_L_ALL);
+            ++i;    xlevel(SLOG_ALL);
         } else
         if (0==strcmp(arg, "xlevel")) {
             int level;
             i = arg_parse_int(i, argc, argv, &level);
             xlevel(level);
-        } else
-        if (0==strcmp(arg, "xadd") || 0==strcmp(arg, "x")) {
-            char *keyset = 0;
-            i = arg_parse_str(i, argc, argv, &keyset);
-            if (i>0) {
-                xbinds(SLOG_L_KEY, keyset);
-            }
         } else
         {
             xerr("@cmdl>> invalid opt `%s`\n", arg);
@@ -977,7 +970,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return i;
 }
@@ -987,7 +980,7 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     yuv_seq_t *psrc = &cfg->src;
     yuv_seq_t *pdst = &cfg->dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (!cfg->ios[CVT_IOS_DST].path || 
         !cfg->ios[CVT_IOS_SRC].path) {
@@ -1028,10 +1021,10 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     pdst->height = psrc->height;
     set_yuv_prop_by_copy(psrc, 0, psrc);
     set_yuv_prop_by_copy(pdst, 0, pdst);
-    xlog("@cfg> src: ");  show_yuv_prop(psrc);
-    xlog("@cfg> dst: ");  show_yuv_prop(pdst);
+    show_yuv_prop(psrc, SLOG_CFG, "@cfg>> src: ");
+    show_yuv_prop(pdst, SLOG_CFG, "@cfg>> dst: ");
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -1080,7 +1073,10 @@ int yuv_cvt(int argc, char **argv)
     cvt_arg_init (&cfg, argc, argv);
     
     r = cvt_arg_parse(&cfg, argc, argv);
-    if (r < 0) {
+    if (r == 0) {
+        //help exit
+        return 0;
+    } else if (r < 0) {
         xerr("cvt_arg_parse() failed\n");
         cvt_arg_help();
         return 1;
@@ -1109,7 +1105,7 @@ int yuv_cvt(int argc, char **argv)
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        xlog("@frm> #%d +\n", i);
+        xlog(SLOG_L1, "@frm> #%d +\n", i);
         r=fseek(cfg.ios[CVT_IOS_SRC].fp, cfg.src.io_size * i, SEEK_SET);
         if (r) {
             xerr("fseek %d error\n", cfg.src.io_size * i);
@@ -1119,7 +1115,7 @@ int yuv_cvt(int argc, char **argv)
         r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
             if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
-                xlog("@seq> reach file end, force stop\n");
+                xlog(SLOG_INFO, "@seq> reach file end, force stop\n");
             } else {
                 xerr("error reading file\n");
             }
@@ -1135,7 +1131,7 @@ int yuv_cvt(int argc, char **argv)
             xerr("error writing file\n");
             break;
         }
-        xlog("@frm> #%d -\n", i);
+        xlog(SLOG_L1, "@frm> #%d -\n", i);
     } // end frame loop
     
     cvt_arg_close(&cfg);

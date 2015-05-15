@@ -37,6 +37,8 @@ int main(int argc, char **argv)
         {"fmt",     yuv_fmt},
     };
     
+    xlog_init(SLOG_DBG-1);
+    
     if (argc<2) {
         printf("No module specified. ");
     } else {

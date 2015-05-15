@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <malloc.h>
 #include <stdio.h>
+
 #include "yuvdef.h"
 
 
@@ -229,7 +230,7 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
     if (new_buf) {
         yuv->pbuf = new_buf;
         yuv->buf_size = buf_size;
-        xlog("@buf>> yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
+        xlog(SLOG_MEM, "@buf>> yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
     } else {
         xerr("@buf>> yuv_buf_malloc(%d) failed\n", buf_size);
     }
@@ -239,23 +240,29 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
 void yuv_buf_free(yuv_seq_t *yuv)
 {
     if (yuv && yuv->pbuf) {
-        xlog("@buf>> yuv_buf_free() = 0x%08x\n", yuv->pbuf);
+        xlog(SLOG_MEM, "@buf>> yuv_buf_free() = 0x%08x\n", yuv->pbuf);
         free(yuv->pbuf);
         yuv->pbuf = 0;
         yuv->buf_size = 0;
     }   
 }
 
-void show_yuv_prop(yuv_seq_t *yuv)
+void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
 {
-#define XTR_X(v) xlog__(#v "=0x%08x, ", yuv->v)
-#define XTR_I(v) xlog__(#v "=%d, ", yuv->v)
+#define XTR_X(v) xlog(level, #v "=0x%08x, ", yuv->v)
+#define XTR_I(v) xlog(level, #v "=%d, ", yuv->v)
 
-    xlog__("@yuv> 0x%08x : {", yuv);
+    const char* show_fmt(int ifmt);
+
+    xlog(level, "%s@0x%08x : {", SAFE_STR(prompt), yuv); 
+    if (!yuv) {
+        return;
+    }
     
     XTR_I(width     );
     XTR_I(height    );
-    XTR_I(yuvfmt    );
+    XTR_I(yuvfmt    );      
+    xlog(level, "(%s), ", show_fmt(yuv->yuvfmt));
     XTR_I(nlsb      );
     XTR_I(nbit      );
     XTR_I(btile     );
@@ -270,5 +277,5 @@ void show_yuv_prop(yuv_seq_t *yuv)
     XTR_I(tile.th   );
     XTR_I(tile.tsz  );
     
-    xlog__("}\n");
+    xlog(level, "}\n");
 }

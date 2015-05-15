@@ -27,7 +27,6 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvfmt.h"
-#include "sim_opt.h"
 
 extern const opt_enum_t cmn_fmt[];
 extern const int n_cmn_fmt;
@@ -72,7 +71,7 @@ int yuv_fmt(int argc, char **argv)
     };
     const int n_fmt_opt = ARRAY_SIZE(fmt_opt);
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     r = cmdl_help(n_fmt_opt, fmt_opt);
     

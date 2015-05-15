@@ -17,7 +17,6 @@
 #ifndef __YUVCMP_H__
 #define __YUVCMP_H__
 
-#include "sim_log.h"
 
 enum cmp_ios_channel {
     CMP_IOS_DIFF = 2,

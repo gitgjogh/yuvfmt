@@ -17,8 +17,6 @@
 #ifndef __YUVCVT_H__
 #define __YUVCVT_H__
 
-#include "sim_opt.h"
-
 enum {
     B10_2_B16   = 0,
     B16_2_B10   = 1,

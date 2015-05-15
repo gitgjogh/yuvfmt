@@ -140,7 +140,7 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
     int w   = rect10->width; 
     int h   = rect10->height; 
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert (rect10->nbit == 10);
     assert (rect16->nbit == 16);
@@ -191,7 +191,7 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
         b10_rect_unpack(b_pack, b10_base, b10_stride, b16_base, b16_stride, w, h);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return;
 }
@@ -252,7 +252,7 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
 {
     int fmt = tile10->yuvfmt;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     int tw  = tile10->tile.tw;
     int th  = tile10->tile.th;
@@ -314,7 +314,7 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
         b10_tile_unpack(b_pack, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return 0;
 }

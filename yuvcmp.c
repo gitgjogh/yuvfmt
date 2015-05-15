@@ -17,6 +17,7 @@
 #include <limits.h>
 #include <string.h>
 #include <malloc.h>
+#include <stdio.h>
 #include <math.h>
 
 #include "yuvdef.h"
@@ -102,7 +103,7 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
                          int stride[3], dstat_t *stat);
     dstat_t st = {0};
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     rect_diff = (seq1->nbit == 8) ? b8_rect_diff : b16_rect_diff;
     
@@ -152,7 +153,7 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
         rect_diff(w, h, base, stride, &st);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     if (stat) {
         stat->cnt += st.cnt;
@@ -165,8 +166,6 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
 
 int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
 {
-    xinit(SLOG_L_ADD);
-    xbinds(SLOG_L_ADD, "cfg,cmdl");
     set_yuv_prop(&cfg->seq[0], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
     set_yuv_prop(&cfg->seq[1], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
     set_yuv_prop(&cfg->seq[2], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
@@ -179,7 +178,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     yuv_seq_t *yuv = &cfg->seq[0];
     yuv_seq_t *seq = &cfg->seq[0];
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (argc<2) {
         return -1;
@@ -226,7 +225,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cmp_arg_help();
-            return -1;
+            return 0;
         } else
         if (0==strcmp(arg, "i0")) {
             char *path;
@@ -285,25 +284,15 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_range(i, argc, argv, &cfg->blksz);
         } else
         if (0==strcmp(arg, "xnon")) {
-            ++i;    xlevel(SLOG_L_NON);
-        } else
-        if (0==strcmp(arg, "xkey")) {
-            ++i;    xlevel(SLOG_L_KEY);
+            ++i;    xlevel(SLOG_NON);
         } else
         if (0==strcmp(arg, "xall")) {
-            ++i;    xlevel(SLOG_L_ALL);
+            ++i;    xlevel(SLOG_ALL);
         } else
-        if (0==strcmp(arg, "xlevel")) {
+        if (0==strcmp(arg, "x") || 0==strcmp(arg, "xlevel")) {
             int level;
             i = arg_parse_int(i, argc, argv, &level);
             xlevel(level);
-        } else
-        if (0==strcmp(arg, "xadd") || 0==strcmp(arg, "x")) {
-            char *keyset = 0;
-            i = arg_parse_str(i, argc, argv, &keyset);
-            if (i>0) {
-                xbinds(SLOG_L_KEY, keyset);
-            }
         } else
         {
             xerr("@cmdl>> invalid opt `%s`\n", arg);
@@ -311,7 +300,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return i;
 }
@@ -321,7 +310,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     int i = 0;
     yuv_seq_t* yuv = &cfg->seq[0];
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     for (i=0; i<2; ++i) 
     {
@@ -361,10 +350,11 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
     for (i=0; i<3; ++i) {
         set_yuv_prop_by_copy(&cfg->seq[i], 0, &cfg->seq[i]);
-        xlog("@cfg> yuv#%d: ", i);  show_yuv_prop(&cfg->seq[i]);
+        xlog(SLOG_CFG, "@cfg> yuv#%d: ", i);  
+        show_yuv_prop(&cfg->seq[i], SLOG_CFG, 0);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -376,11 +366,12 @@ int cmp_arg_close(cmp_opt_t *cfg)
 
 int cmp_arg_help()
 {
+    printf("yuv sequences comparation. Options\n");
+    printf("-wxh <%%dx%%d>\n");
     printf("-i0 name<%%s> {...yuv props...} \n");
     printf("-i1 name<%%s> {...yuv props...} \n");
     printf("-o  name<%%s> {...yuv props...} \n");
     printf("\n...yuv props...\n");
-    printf("\t [-wxh <%%dx%%d>]\n");
     printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
     printf("\t [-stride <%%d>]\n");
     printf("\t [-fsize <%%d>]\n");
@@ -404,7 +395,10 @@ int yuv_cmp(int argc, char **argv)
     cmp_arg_init (&cfg, argc, argv);
     
     r = cmp_arg_parse(&cfg, argc, argv);
-    if (r < 0) {
+    if (r == 0) {
+        //help exit
+        return 0;
+    } else if (r < 0) {
         xerr("cmp_arg_parse() failed\n");
         cmp_arg_help();
         return 1;
@@ -420,14 +414,14 @@ int yuv_cmp(int argc, char **argv)
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             TILE_0, 0, 0);
-    xlog("@cfg>> mid type: \n");  show_yuv_prop(&seq[3]);
+    show_yuv_prop(&seq[3], SLOG_DBG, "@cfg>> mid type: ");
 
     /*************************************************************************
      *                          frame loop
      ************************************************************************/
     for (j=cfg.frame_range[0]; j<cfg.frame_range[1]; j++) 
     {
-        xlog("@frm> **** %d ****\n", j);
+        xlog(SLOG_DBG, "@frm> **** %d ****\n", j);
 
         for (i=0; i<2; ++i) 
         {
@@ -440,7 +434,7 @@ int yuv_cmp(int argc, char **argv)
             r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.ios[i].fp);
             if (r<1) {
                 if ( ios_feof(cfg.ios, i) ) {
-                    xlog("@seq>> $%d: reach file end, force stop\n", i);
+                    xlog(SLOG_L1, "@seq>> $%d: reach file end, force stop\n", i);
                 } else {
                     xerr("@seq>> $%d: error reading file\n", i);
                 }
@@ -467,7 +461,7 @@ int yuv_cmp(int argc, char **argv)
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
-        xlog("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
+        xlog(SLOG_L1, "@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.ios[2].fp) {
             set_yuv_prop_by_copy(spl[0], 1, &cfg.seq[2]);
@@ -481,7 +475,7 @@ int yuv_cmp(int argc, char **argv)
     }
     
     psnr = get_stat_psnr(&stat[1]);
-    xlog("@seq>> PSNR = %.2llf\n", psnr);
+    xlog(SLOG_L0, "@seq>> PSNR = %.2llf\n", psnr);
     
     cmp_arg_close(&cfg);
     for (i=0; i<3; ++i) {
