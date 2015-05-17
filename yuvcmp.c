@@ -135,31 +135,17 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
         
         rect_diff(w, h, base, stride, &st);
     }
-    else if (is_semi_planar(fmt))
-    {
-        rect_diff(w, h, base, stride, &st);
-        
-        for (i=0; i<3; ++i) {
-            base[i]  += seq[i]->y_size;
-            stride[i] = seq[i]->uv_stride;
-        }        
-        h   = is_mch_422(fmt) ? h : h/2;
-        
-        rect_diff(w, h, base, stride, &st);
+    else {
+        xerr("Not support format (%d) in yuv_diff()\n", fmt);
     }
-    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        w   = w*2;
-        rect_diff(w, h, base, stride, &st);
-    }
-    
-    LEAVE_FUNC();
     
     if (stat) {
         stat->cnt += st.cnt;
         stat->sad += st.sad;
         stat->ssd += st.ssd;
     }
+    
+    LEAVE_FUNC();
     
     return st;
 }
