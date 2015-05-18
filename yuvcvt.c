@@ -1055,10 +1055,14 @@ int cvt_arg_help()
     printf("\t [-n-frame|-n <%%d>]\n");
     
     int j;
-    printf("\nwxh can be short as follow:\n");
+    printf("\n-wxh option can be short as follow:\n");
     for (j=0; j<n_cmn_res; ++j) {
-        printf("\t -%-4s : %4dx%-4d\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
     }
+    //printf("\nfmt can be short as follow:\n");
+    //for (j=0; j<n_cmn_fmt; ++j) {
+    //    printf("\t -%-7s : %2d\n", cmn_fmt[j].name, cmn_fmt[j].val);
+    //}
     return 0;
 }
 

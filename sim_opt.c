@@ -35,8 +35,8 @@ int clip(int v, int minv, int maxv)
 
 int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
 {
-    minL = min(minL, SLOG_NON);
-    maxL = max(maxL, SLOG_ALL);
+    minL = max(minL, SLOG_NON);
+    maxL = min(maxL, SLOG_ALL);
     if (minL<=maxL) {
         int level;
         for (level = minL; level <= maxL; ++level) {
@@ -340,6 +340,32 @@ int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
     char *arg = GET_ARGV(++ i, "int");
     *p = arg ? atoi(arg) : default_val;
     return arg ? ++i : i;
+}
+
+int arg_parse_xlevel(int i, int argc, char *argv[])
+{
+    int j = i;
+    while (i>=j && i<argc)
+    {
+        char *arg = &argv[i][1];
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_NON);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_ALL);
+        } else
+        if (0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
+        {
+            break;
+        }
+        j = i;
+    }
+    
+    return i;
 }
 
 char* cmdl_typestr(int type)

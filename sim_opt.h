@@ -115,6 +115,7 @@ int     arg_parse_str(int i, int argc, char *argv[], char **p);
 int     arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz);
 int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
+int     arg_parse_xlevel(int i, int argc, char *argv[]);
 
 
 enum option_type {

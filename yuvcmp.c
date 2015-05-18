@@ -363,6 +363,12 @@ int cmp_arg_help()
     printf("\t [-fsize <%%d>]\n");
     printf("\t [-b10]\n");
     printf("\t [-btile]\n");
+    
+    int j;
+    printf("\n-wxh option can be short as follow:\n");
+    for (j=0; j<n_cmn_res; ++j) {
+        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+    }
     return 0;
 }
 

@@ -29,33 +29,17 @@ int main(int argc, char **argv)
     typedef struct yuv_module {
         const char *name; 
         int (*func)(int argc, char **argv);
+        const char *help;
     } yuv_module_t;
     
     const static yuv_module_t sub_main[] = {
-        {"cvt",     yuv_cvt},
-        {"cmp",     yuv_cmp},
-        {"fmt",     yuv_fmt},
+        {"cvt",     yuv_cvt,    "yuv fmt convertor"},
+        {"cmp",     yuv_cmp,    "yuv diff/psnr"},
+        {"fmt",     yuv_fmt,    "another yuvcvt with diff cmdl style"},
     };
 
     xlog_init(SLOG_DBG-1);
-    for (i=1; i>=1 && i<argc; )
-    {
-        char *arg = &argv[i][1];
-        if (0==strcmp(arg, "xnon")) {
-            ++i;    xlevel(SLOG_NON);
-        } else
-        if (0==strcmp(arg, "xall")) {
-            ++i;    xlevel(SLOG_ALL);
-        } else
-        if (0==strcmp(arg, "xlevel")) {
-            int level;
-            i = arg_parse_int(i, argc, argv, &level);
-            xlevel(level);
-        } else
-        {
-            break;
-        }
-    }
+    i = arg_parse_xlevel(1, argc, argv);
     
     xdbg("@cmdl>> argv[%d] = %s\n", i, i<argc ? argv[i] : "?");
 
@@ -67,12 +51,14 @@ int main(int argc, char **argv)
                 return sub_main[j].func(argc-i, argv+i);
             }
         }
-        printf("`%s` is not support. ", argv[i]);
+        if (strcmp(argv[i], "-h") && strcmp(argv[i], "--help")) {
+            printf("`%s` is not support. ", argv[i]);
+        }
     }
     
     printf("Use the following modules:\n");
     for (j=0; j<ARRAY_SIZE(sub_main); ++j) {
-        printf("\t%s\n", sub_main[j].name);
+        printf("\t%4s - %s\n", sub_main[j].name, sub_main[j].help);
     }
     return exit_code;
     
