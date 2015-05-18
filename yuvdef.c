@@ -254,7 +254,7 @@ void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
 
     const char* show_fmt(int ifmt);
 
-    xlog(level, "%s@0x%08x : {", SAFE_STR(prompt), yuv); 
+    xlog(level, "%s@0x%08x : {", SAFE_STR(prompt,""), yuv); 
     if (!yuv) {
         return;
     }

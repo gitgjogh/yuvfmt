@@ -17,9 +17,10 @@
 #ifndef __YUVFMT_H__
 #define __YUVFMT_H__
 
+int fmt_arg_init (cvt_opt_t *cfg, int argc, char *argv[]);
 int fmt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[]);
 int fmt_arg_check(cvt_opt_t *cfg, int argc, char *argv[]);
-int fmt_arg_help();
+int fmt_arg_help (cvt_opt_t *cfg, int argc, char *argv[]);
 
 int yuv_fmt(int argc, char **argv);
 

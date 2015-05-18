@@ -1,13 +1,12 @@
 CC = cc
 CPPFLAGS = -O3
-MACROS = -D_XLOG_
 INCLUDES = 
 
 LIBS = -lm
 OBJS = yuvdef.o 
 OBJS += yuvcvt_b8tile.o yuvcvt_b10.o yuvcvt.o yuvfmt.o
 OBJS += yuvcmp.o 
-OBJS += sim_log.o sim_opt.o 
+OBJS += sim_opt.o 
 OBJS += yuvmain.o
 TARGET = yuv
 

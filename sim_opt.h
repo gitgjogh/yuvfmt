@@ -23,6 +23,10 @@
 #define max(a,b) ((a)>(b) ? (a) : (b))
 #endif
 
+#ifndef min
+#define min(a,b) ((a)<(b) ? (a) : (b))
+#endif
+
 typedef enum slog_level {
     SLOG_NON        = 0,
     SLOG_ERR        ,
@@ -72,12 +76,14 @@ int xlogv(int level, const char *fmt, va_list ap);
 int xlog (int level, const char *fmt, ...);
 int xerrv(const char *fmt, va_list ap);
 int xerr (const char *fmt, ...);
+int xdbgv(const char *fmt, va_list ap);
+int xdbg (const char *fmt, ...);
 
 static int fcall_layer = 0;
 #define ENTER_FUNC()  xlog(SLOG_FUNC, "@>>>> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
 #define LEAVE_FUNC()  xlog(SLOG_FUNC, "@<<<< %-2d: %s(-)\n\n", --fcall_layer, __FUNCTION__)
-#define NULLSTR       ("")
-#define SAFE_STR(s)   ((s)?(s):NULLSTR)
+#define EMPTYSTR                ("")
+#define SAFE_STR(s, nnstr)      ((s)?(s):(nnstr))
 
 
 #ifndef MAX_PATH
@@ -156,11 +162,12 @@ int cmdl_set_ref(int optc, opt_desc_t optv[],
                 const char *name, int n_ref, opt_ref_t *refs);
 int cmdl_set_enum(int optc, opt_desc_t optv[], 
                 const char *name, int n_enum, opt_enum_t *enums);
-    
-int cmdl_get_optdesc(int optc, opt_desc_t optv[], const char *name);
-int cmdl_get_optargs(int i, int argc, char *argv[], opt_desc_t *opt);
+
+int cmdl_getdesc_byref (int optc, opt_desc_t optv[], const char *name);
+int cmdl_getdesc_byname(int optc, opt_desc_t optv[], const char *name);
 int cmdl_init(int optc, opt_desc_t optv[]);
 int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[]);
+int cmdl_parse_opt(int i, int argc, char *argv[], opt_desc_t *opt);
 int cmdl_help(int optc, opt_desc_t optv[]);
 int cmdl_check(int optc, opt_desc_t optv[]);
 int cmdl_result(int optc, opt_desc_t optv[]);
