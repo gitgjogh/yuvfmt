@@ -1395,11 +1395,11 @@ int main(int argc, char **argv)
             if (cfg.dst.btile) {
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.dst.yuvfmt, BIT_10, TILE_1, 0, 0);
-                b10_tile_unpack_mch(psrc, pdst, B16_2_B10);
+                b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
             } else {
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.dst.yuvfmt, BIT_10, TILE_0, 0, 0);
-                b10_rect_unpack_mch(psrc, pdst, B16_2_B10);
+                b10_rect_unpack_mch(pdst, psrc, B16_2_B10);
             }
         }
         else if (cfg.dst.nbit==8)
