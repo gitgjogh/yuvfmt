@@ -31,6 +31,11 @@ enum {
     
     TILE_0      = 0,
     TILE_1      = 1,
+
+    LINE2RECT   = 0,
+    RECT2LINE   = 1,    
+    TILE2RECT   = LINE2RECT,
+    RECT2TILE   = RECT2LINE,
     
     BIT_8       = 8,
     BIT_10      = 10,
@@ -231,118 +236,6 @@ void b8_linear_2_rect_width_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
     }
 }
 
-void b8_linear_2_rect(uint8_t* line, uint8_t* rect, int w, int h, int s)
-{
-    if      ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) )
-        b8_linear_2_rect_align_0(line, rect, w, h, s);
-    else if ( ((int)line&7) || (w&7) || ((int)rect&7) || (s&7) )
-        b8_linear_2_rect_align_4(line, rect, w, h, s);
-    else if ( w == 8 )
-        b8_linear_2_rect_width_8(line, rect, w, h, s); 
-    else
-        b8_linear_2_rect_align_8(line, rect, w, h, s);   
-}
-
-void b8_tile_2_rect
-(
-    uint8_t* pt, int tw, int th, int tsz, int ts, 
-    uint8_t* pl, int w,  int h,  int s
-)
-{
-    int x, y, tx, ty;
-    void (*line2rect_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
-    
-    ENTER_FUNC;
-
-    if      ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) )
-        line2rect_func_p = b8_linear_2_rect_align_0;
-    else if ( ((int)pl&7) || (tw&7) || (tsz&7) || (ts&7) || ((int)pl&7) || (s&7) )
-        line2rect_func_p = b8_linear_2_rect_align_4;
-    else if ( tw == 8 )
-        line2rect_func_p = b8_linear_2_rect_width_8; 
-    else
-        line2rect_func_p = b8_linear_2_rect_align_8;     
-
-    for (ty=0, y=0; y<h; y+=th, ++ty) 
-    {
-        for (tx=0, x=0; x<w; x+=tw, ++tx) 
-        {
-            uint8_t* src = &pt[ts*ty + tsz*tx];
-            uint8_t* dst = &pl[s * y + x];
-
-            line2rect_func_p(src, dst, tw, th, s);
-        }
-    } 
-    
-    LEAVE_FUNC;
-}
-
-void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
-{
-    int fmt = tile->yuvfmt;
-    
-    int tw  = tile->tile.tw;
-    int th  = tile->tile.th;
-    int tsz = tile->tile.tsz;
-    int ts  = tile->y_stride;
-    int w   = rect->width;
-    int h   = rect->height;
-    int s   = rect->y_stride;
-    uint8_t *pt = tile->pbuf;
-    uint8_t *pl = rect->pbuf;
-    
-    ENTER_FUNC;
-    
-    assert (tile->nbit == 8);
-    assert (rect->nbit == 8);
-    assert (tile->width == rect->width);
-    assert (tile->height == rect->height);
-    
-    if (fmt == YUVFMT_400P) {
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-    }
-    else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
-    {
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-        
-        ts  = tile->uv_stride;
-        s   = rect->uv_stride;
-        w   = w/2;
-        h   = is_mch_422(fmt) ? h : h/2;
-        
-        pt += tile->y_size;
-        pl += rect->y_size;
-        
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-        
-        pt += tile->uv_size;
-        pl += rect->uv_size;
-        
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-    }
-    else if (is_semi_planar(fmt))
-    {
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-        
-        ts  = tile->uv_stride;
-        s   = rect->uv_stride;
-        h   = is_mch_422(fmt) ? h : h/2;
-
-        pt += tile->y_size;
-        pl += rect->y_size;
-        
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-    }
-    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        w   = w*2;
-        b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
-    }
-    
-    LEAVE_FUNC;
-
-    return;
-}
 
 void b8_rect_2_linear_align_0(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
@@ -390,53 +283,61 @@ void b8_rect_2_linear_width_8(uint8_t* line, uint8_t* rect, int w, int h, int s)
     }
 }
 
-void b8_rect_2_linear(uint8_t* line, uint8_t* rect, int w, int h, int s)
+void b8_linear_2_rect(int b_l2r, uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
-    if      ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) )
-        b8_rect_2_linear_align_0(line, rect, w, h, s);
-    else if ( ((int)line&7) || (w&7) || ((int)rect&7) || (s&7) )
-        b8_rect_2_linear_align_4(line, rect, w, h, s);
-    else if ( w == 8 )
-        b8_rect_2_linear_width_8(line, rect, w, h, s); 
-    else
-        b8_rect_2_linear_align_8(line, rect, w, h, s);   
+    void (*map_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
+    
+    if        ( ((int)line&3) || (w&3) || ((int)rect&3) || (s&3) ) {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_0 : b8_rect_2_linear_align_0;
+    } else if ( ((int)line&7) || (w&7) || ((int)rect&7) || (s&7) ) {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_4 : b8_rect_2_linear_align_4;
+    } else if ( w == 8 )  {
+        map_func_p = b_l2r ? b8_linear_2_rect_width_8 : b8_rect_2_linear_width_8; 
+    } else {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_8 : b8_rect_2_linear_align_8;
+    }
+    
+    map_func_p(line, rect, w, h, s);
 }
 
-void b8_rect_2_tile
+void b8_tile_2_rect
 (
+    int b_t2r, 
     uint8_t* pt, int tw, int th, int tsz, int ts, 
     uint8_t* pl, int w,  int h,  int s
 )
 {
     int x, y, tx, ty;
-    void (*rect2line_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
+    void (*map_func_p)(uint8_t* line, uint8_t* rect, int w, int h, int s);
+    int b_l2r = (b_t2r == TILE2RECT);
     
     ENTER_FUNC;
 
-    if      ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) )
-        rect2line_func_p = b8_rect_2_linear_align_0;
-    else if ( ((int)pl&7) || (tw&7) || (tsz&7) || (ts&7) || ((int)pl&7) || (s&7) )
-        rect2line_func_p = b8_rect_2_linear_align_4;
-    else if ( tw == 8 )
-        rect2line_func_p = b8_rect_2_linear_width_8; 
-    else
-        rect2line_func_p = b8_rect_2_linear_align_8;     
-
+    if        ( ((int)pt&3) || (tw&3) || (tsz&3) || (ts&3) || ((int)pl&3) || (s&3) ) {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_0 : b8_rect_2_linear_align_0;
+    } else if ( ((int)pl&7) || (tw&7) || (tsz&7) || (ts&7) || ((int)pl&7) || (s&7) ) {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_4 : b8_rect_2_linear_align_4;
+    } else if ( tw == 8 ) {
+        map_func_p = b_l2r ? b8_linear_2_rect_width_8 : b8_rect_2_linear_width_8;  
+    } else {
+        map_func_p = b_l2r ? b8_linear_2_rect_align_8 : b8_rect_2_linear_align_8;    
+    } 
+    
     for (ty=0, y=0; y<h; y+=th, ++ty) 
     {
         for (tx=0, x=0; x<w; x+=tw, ++tx) 
         {
-            uint8_t* tile = &pt[ts*ty + tsz*tx];
-            uint8_t* rect = &pl[s * y + x];
+            uint8_t* src = &pt[ts*ty + tsz*tx];
+            uint8_t* dst = &pl[s * y + x];
 
-            rect2line_func_p(tile, rect, tw, th, s);
+            map_func_p(src, dst, tw, th, s);
         }
     } 
     
     LEAVE_FUNC;
 }
 
-void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
+void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect, int b_t2r)
 {
     int fmt = tile->yuvfmt;
     
@@ -453,15 +354,16 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     ENTER_FUNC;
     
     assert (tile->nbit == 8);
-    assert (rect->nbit == 8);    assert (tile->width == rect->width);
+    assert (rect->nbit == 8);
+    assert (tile->width == rect->width);
     assert (tile->height == rect->height);
     
     if (fmt == YUVFMT_400P) {
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
     {
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = tile->uv_stride;
         s   = rect->uv_stride;
@@ -471,16 +373,16 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
         pt += tile->y_size;
         pl += rect->y_size;
         
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
         
         pt += tile->uv_size;
         pl += rect->uv_size;
         
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (is_semi_planar(fmt))
     {
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
         
         ts  = tile->uv_stride;
         s   = rect->uv_stride;
@@ -489,12 +391,12 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
         pt += tile->y_size;
         pl += rect->y_size;
         
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
     {
         w   = w*2;
-        b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
+        b8_tile_2_rect(b_t2r, pt, tw, th, tsz, ts, pl, w, h, s);
     }
     
     LEAVE_FUNC;
@@ -746,13 +648,13 @@ int b10_tile_unpack
             uint8_t* p16 = &rect16_base[s * y + sizeof(uint16_t) * x];
             
             if (b_pack==B16_2_B10) {
-                b8_rect_2_linear(unpack_base, p16, tw*2, th, s);
+                b8_linear_2_rect(RECT2LINE, unpack_base, p16, tw*2, th, s);
                 b16_rect_transpose(unpack_base, tw, th);
                 b10_linear_pack_lte(p10, tsz, unpack_base, tw*th);
             } else {
                 b10_linear_unpack_lte(p10, tsz, unpack_base, tw*th);
                 b16_rect_transpose(unpack_base, tw, th);
-                b8_linear_2_rect(unpack_base, p16, tw*2, th, s);
+                b8_linear_2_rect(LINE2RECT, unpack_base, p16, tw*2, th, s);
             }
         }
     }
@@ -1324,7 +1226,7 @@ int main(int argc, char **argv)
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
-                b8_tile_2_rect_mch(psrc, pdst);
+                b8_tile_2_rect_mch(psrc, pdst, TILE2RECT);
             }
         }
 
@@ -1409,7 +1311,7 @@ int main(int argc, char **argv)
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.dst.yuvfmt, BIT_8, TILE_1,
                         cfg.dst.y_stride, cfg.dst.io_size);
-                b8_rect_2_tile_mch(psrc, pdst);
+                b8_tile_2_rect_mch(pdst, psrc, RECT2TILE);
             }
         }
         else if (cfg.dst.nbit==16)
