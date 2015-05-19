@@ -1371,10 +1371,10 @@ void show_yuv_prop(yuv_seq_t *yuv)
     printf("\n");
 }
 
-static int arg_init (yuv_cfg_t *cfg, int argc, char *argv[]);
-static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[]);
-static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[]);
-static int arg_help()
+static int cvt_arg_init (cvt_opt_t *cfg, int argc, char *argv[]);
+static int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[]);
+static int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[]);
+static int cvt_arg_help()
 {
     printf("-dst name<%%s> {...yuv props...} \n");
     printf("-src name<%%s> {...yuv props...} \n");
@@ -1389,10 +1389,10 @@ static int arg_help()
     return 0;
 }
 
-int main(int argc, char **argv)
+int yuv_cvt(int argc, char **argv)
 {
     int         r, i;
-    yuv_cfg_t   cfg;
+    cvt_opt_t   cfg;
     yuv_seq_t   seq[2];
     yuv_seq_t   *psrc = &seq[0];
     yuv_seq_t   *pdst = &seq[1];
@@ -1400,12 +1400,12 @@ int main(int argc, char **argv)
     
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
-    r = arg_parse(&cfg, argc, argv);
+    r = cvt_arg_parse(&cfg, argc, argv);
     if (r < 0) {
-        arg_help();
+        cvt_arg_help();
         return 1;
     }
-    r = arg_check(&cfg, argc, argv);
+    r = cvt_arg_check(&cfg, argc, argv);
     if (r < 0) {
         printf("\n****src****\n");  show_yuv_prop(&cfg.src);
         printf("\n****dst****\n");  show_yuv_prop(&cfg.dst);
@@ -1746,7 +1746,7 @@ static int arg_parse_int(int i, int argc, char *argv[], int *p)
     return arg ? ++i : -1;
 }
 
-static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
+static int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
 {
     int i, j;
     yuv_seq_t *seq = &cfg->dst;
@@ -1803,7 +1803,7 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
         }
         
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
-            arg_help();
+            cvt_arg_help();
             return -1;
         } else
         if (0==strcmp(arg, "src")) {
@@ -1860,7 +1860,7 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[])
     return i;
 }
 
-static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
+static int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
 {
     yuv_seq_t *psrc = &cfg->src;
     yuv_seq_t *pdst = &cfg->dst;
@@ -1897,6 +1897,68 @@ static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[])
     pdst->nlsb = pdst->nlsb ? pdst->nlsb : pdst->nbit;
     
     LEAVE_FUNC;
+    
+    return 0;
+}
+
+static int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
+{
+    return 0;
+}
+
+static int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
+{
+    return 0;
+}
+
+static int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
+{
+    return 0;
+}
+
+static int cmp_arg_help()
+{
+    return 0;
+}
+
+int yuv_cmp(int argc, char **argv)
+{
+    printf("It's a dummy module.");
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    int j = 0;
+    int exit_code = 0;
+    
+    typedef struct yuv_module {
+        const char *name; 
+        int (*func)(int argc, char **argv);
+        int (*help)();
+    } yuv_module_t;
+    
+    const static yuv_module_t sub_main[] = {
+        {"cvt",     yuv_cvt,    cvt_arg_help},
+        {"cmp",     yuv_cmp,    cmp_arg_help},
+    };
+    
+    if (argc<2) {
+        printf("No module specified. ");
+    } else {
+        for (j=0; j<ARRAY_SIZE(sub_main); ++j) {
+            if (0==strcmp(argv[1], sub_main[j].name)) {
+                return sub_main[j].func(argc-1, argv+1);
+            }
+        }
+        printf("`%s` is not support. ", argv[1]);
+    }
+    
+    printf("Use the following modules:\n");
+    for (j=0; j<ARRAY_SIZE(sub_main); ++j) {
+        printf("\t%s\n", sub_main[j].name);
+    }
+    return exit_code;
     
     return 0;
 }
