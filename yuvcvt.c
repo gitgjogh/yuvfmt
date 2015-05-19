@@ -156,13 +156,13 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     
     for (y=0; y<h; ++y) 
     {
+        memcpy(dst_u, src_u, linesize);
+        memcpy(dst_v, src_v, linesize);
+        
         dst_u += pdst->uv_stride + dst_uv_shift;
         src_u += psrc->uv_stride + src_uv_shift;
         dst_v += pdst->uv_stride + dst_uv_shift;
         src_v += psrc->uv_stride + src_uv_shift;
-        
-        memcpy(dst_u, src_u, linesize);
-        memcpy(dst_v, src_v, linesize);
         
         if (dst_uv_shift>0) 
         {
