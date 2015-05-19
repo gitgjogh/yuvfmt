@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include "sim_opt.h"
 
 
 #ifndef MAX_PATH
@@ -38,9 +39,11 @@
 
 
 #ifndef ENTER_FUNC
-static int fcall_layer = 0;
-#define ENTER_FUNC  printf("@+++> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
-#define LEAVE_FUNC  printf("@---> %-2d: %s(-)\n", --fcall_layer, __FUNCTION__)
+#define ENTER_FUNC()    do{} while(0)
+#endif
+
+#ifndef LEAVE_FUNC
+#define LEAVE_FUNC()    do{} while(0)
 #endif
 
 typedef union _i64_pack {

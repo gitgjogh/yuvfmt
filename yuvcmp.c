@@ -22,7 +22,6 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
-#include "sim_opt.h"
 
 
 double get_stat_psnr(dstat_t *s)
@@ -104,7 +103,7 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
                          int stride[3], dstat_t *stat);
     dstat_t st = {0};
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     rect_diff = (seq1->nbit == 8) ? b8_rect_diff : b16_rect_diff;
     
@@ -154,7 +153,7 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
         rect_diff(w, h, base, stride, &st);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     if (stat) {
         stat->cnt += st.cnt;
@@ -176,7 +175,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     yuv_seq_t *yuv = &cfg->seq[0];
     yuv_seq_t *seq = &cfg->seq[0];
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (argc<2) {
         return -1;
@@ -286,7 +285,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return i;
 }
@@ -296,7 +295,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     int i = 0;
     yuv_seq_t* yuv = &cfg->seq[0];
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     for (i=0; i<2; ++i) 
     {
@@ -329,7 +328,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }

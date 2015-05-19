@@ -81,8 +81,8 @@ int xdbg (const char *fmt, ...);
 
 #ifndef ENTER_FUNC
 static int fcall_layer = 0;
-#define ENTER_FUNC  xlog(SLOG_FUNC, "@>>>> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
-#define LEAVE_FUNC  xlog(SLOG_FUNC, "@<<<< %-2d: %s(-)\n\n", --fcall_layer, __FUNCTION__)
+#define ENTER_FUNC()  xlog(SLOG_FUNC, "@>>>> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
+#define LEAVE_FUNC()  xlog(SLOG_FUNC, "@<<<< %-2d: %s(-)\n\n", --fcall_layer, __FUNCTION__)
 #endif
 
 #define EMPTYSTR                ("")

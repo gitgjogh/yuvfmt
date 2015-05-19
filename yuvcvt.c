@@ -21,7 +21,6 @@
 
 #include "yuvdef.h"
 #include "yuvcvt.h"
-#include "sim_opt.h"
 
 
 const res_t cmn_res[] = {
@@ -136,7 +135,7 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int h   = psrc->height; 
     int y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert((psrc->nbit==8 && pdst->nbit==8) || (psrc->nbit==16 && pdst->nbit==16));
     assert(is_mch_planar(src_fmt));
@@ -171,7 +170,7 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -195,7 +194,7 @@ int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==8 && spl->nbit==8);
     assert(is_semi_planar(itl->yuvfmt));
@@ -228,7 +227,7 @@ int b8_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -249,7 +248,7 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==8 && spl->nbit==8);
     assert(is_mch_mixed(itl->yuvfmt));
@@ -299,7 +298,7 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }   /* end for y*/
 
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -328,7 +327,7 @@ int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==16 && spl->nbit==16);
     assert(is_semi_planar(itl->yuvfmt));
@@ -361,7 +360,7 @@ int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -382,7 +381,7 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int h   = itl->height; 
     int x, y;
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(itl->nbit==16 && spl->nbit==16);
     assert(is_mch_mixed(itl->yuvfmt));
@@ -432,7 +431,7 @@ int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         }
     }   /* end for y*/
 
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -481,7 +480,7 @@ int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int rshift = (pdst->nlsb > 0) ? (16 - pdst->nlsb) : 0;
     lshift -= rshift;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert(psrc->nbit==16 && pdst->nbit==16);
     assert(psrc->nlsb!=0  && pdst->nlsb!=0 );
@@ -530,7 +529,7 @@ int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
         b16_rect_scale(w, h, lshift, src_base, src_stride, dst_base, dst_stride);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }
@@ -614,7 +613,7 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
     int w   = rect16->width; 
     int h   = rect16->height; 
 
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     assert (rect16->nbit  == 16);
     assert (rect16->nlsb  >= 8);
@@ -664,7 +663,7 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
         b16_n_b8_cvt(b16_base, b16_stride, nlsb, b08_base, b08_stride, b_clip8, w, h);
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return 0;
 }
@@ -680,7 +679,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     yuv_seq_t cfg_src, cfg_dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
 
     memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
     memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
@@ -821,7 +820,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         //TODO: 
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return pdst;
 }
@@ -835,7 +834,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     int i, j;
     yuv_seq_t *seq = &cfg->dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (argc<2) {
         return -1;
@@ -940,7 +939,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         }
     }
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
 
     return i;
 }
@@ -950,7 +949,7 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     yuv_seq_t *psrc = &cfg->src;
     yuv_seq_t *pdst = &cfg->dst;
     
-    ENTER_FUNC;
+    ENTER_FUNC();
     
     if (!cfg->src.path || !cfg->dst.path) {
         printf("@cmdl>> Err : no src or dst\n");
@@ -981,7 +980,7 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     psrc->nlsb = psrc->nlsb ? psrc->nlsb : psrc->nbit;
     pdst->nlsb = pdst->nlsb ? pdst->nlsb : pdst->nbit;
     
-    LEAVE_FUNC;
+    LEAVE_FUNC();
     
     return 0;
 }

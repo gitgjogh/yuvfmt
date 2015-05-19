@@ -147,7 +147,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
         if (yuv->nbit == 8) { 
             t->tw = 8; t->th = 4; t->tsz = 32;
         } else {
-            printf("@err>> not support bitdepth (%d) for tile mode\n", yuv->nbit);
+            xerr("not support bitdepth (%d) for tile mode\n", yuv->nbit);
             t->tw = 8; t->th = 4; t->tsz = 64;
         }
         
