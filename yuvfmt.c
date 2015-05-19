@@ -36,8 +36,8 @@ enum {
     BIT_10      = 10,
     BIT_16      = 16,
     
-    ITL_2_SPL   = 0,
-    SPL_2_ITL   = 1,
+    SPLITTING   = 0,
+    INTERLACING = 1,
 };
 
 typedef struct resolution {
@@ -1093,49 +1093,49 @@ int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
 }
 
 /**
- *  @psrc : semi planar
- *  @pdst : yuv planar
+ *  @itl : uv is interlaced (here 420sp)
+ *  @spl : uv is splitted
  */
-int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2sp)
+int b8mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
 {
-    int fmt = psrc->yuvfmt;
+    int fmt = itl->yuvfmt;
     
-    uint8_t* src_y_base = psrc->pbuf;
-    uint8_t* src_u_base = src_y_base + psrc->y_size;
+    uint8_t* itl_y_base = itl->pbuf;
+    uint8_t* itl_u_base = itl_y_base + itl->y_size;
     
-    uint8_t* dst_y_base = pdst->pbuf;
-    uint8_t* dst_u_base = dst_y_base + pdst->y_size;
-    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
     
-    int w   = psrc->width; 
-    int h   = psrc->height; 
+    int w   = itl->width; 
+    int h   = itl->height; 
     int x, y;
 
     ENTER_FUNC;
     
     for (y=0; y<h; ++y) {
-        uint8_t* src_y = src_y_base + y * psrc->y_stride;
-        uint8_t* dst_y = dst_y_base + y * pdst->y_stride;
-        memcpy(dst_y, src_y, w);
+        uint8_t* itl_y = itl_y_base + y * itl->y_stride;
+        uint8_t* spl_y = spl_y_base + y * spl->y_stride;
+        memcpy(spl_y, itl_y, w);
     }
 
     w   = w/2;
     h   = is_mch_422(fmt) ? h : h/2;
     
     for (y=0; y<h; ++y) {
-        uint8_t* src_u = src_u_base + y * psrc->uv_stride;
-        uint8_t* dst_u = dst_u_base + y * pdst->uv_stride;
-        uint8_t* dst_v = dst_v_base + y * pdst->uv_stride;
+        uint8_t* itl_u = itl_u_base + y * itl->uv_stride;
+        uint8_t* spl_u = spl_u_base + y * spl->uv_stride;
+        uint8_t* spl_v = spl_v_base + y * spl->uv_stride;
 
-        if (b_p2sp) {
+        if (b_interlacing == INTERLACING) {
             for (x=0; x<w; ++x) {
-                *(src_u++) = *(dst_u++);
-                *(src_u++) = *(dst_v++);
+                *(itl_u++) = *(spl_u++);
+                *(itl_u++) = *(spl_v++);
             }
         } else {
             for (x=0; x<w; ++x) {
-                *(dst_u++) = *(src_u++);
-                *(dst_v++) = *(src_u++);
+                *(spl_u++) = *(itl_u++);
+                *(spl_v++) = *(itl_u++);
             }
         }
     }
@@ -1146,19 +1146,19 @@ int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2sp)
 }
 
 /**
- *  @psrc : uyvy or yuyv
- *  @pdst : yuv planar
+ *  @itl : luma & chroma is interlaced (here uyvy or yuyv)
+ *  @spl : luma & chroma is splitted
  */
-int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2yuyv)
+int b8mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
 {
-    uint8_t* src_y_base = psrc->pbuf;
+    uint8_t* itl_y_base = itl->pbuf;
     
-    uint8_t* dst_y_base = pdst->pbuf;
-    uint8_t* dst_u_base = dst_y_base + pdst->y_size;
-    uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
 
-    int w   = psrc->width; 
-    int h   = psrc->height; 
+    int w   = itl->width; 
+    int h   = itl->height; 
     int x, y;
 
     ENTER_FUNC;
@@ -1167,41 +1167,41 @@ int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2yuyv)
 
     for (y=0; y<h; ++y) 
     {
-        uint8_t* src_y  = src_y_base + y * psrc->y_stride;
-        uint8_t* dst_y  = dst_y_base + y * pdst->y_stride;
-        uint8_t* dst_u  = dst_u_base + y * pdst->uv_stride;
-        uint8_t* dst_v  = dst_v_base + y * pdst->uv_stride;
+        uint8_t* itl_y  = itl_y_base + y * itl->y_stride;
+        uint8_t* spl_y  = spl_y_base + y * spl->y_stride;
+        uint8_t* spl_u  = spl_u_base + y * spl->uv_stride;
+        uint8_t* spl_v  = spl_v_base + y * spl->uv_stride;
 
-        if (b_p2yuyv) {
-            if (psrc->yuvfmt == YUVFMT_YUYV) {
+        if (b_interlacing == INTERLACING) {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
                 for (x=0; x<w; ++x) {
-                    *(src_y++) = *(dst_y++);
-                    *(src_y++) = *(dst_u++);
-                    *(src_y++) = *(dst_y++);
-                    *(src_y++) = *(dst_v++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
                 }
             } else {
                 for (x=0; x<w; ++x) {
-                    *(src_y++) = *(dst_u++);
-                    *(src_y++) = *(dst_y++);
-                    *(src_y++) = *(dst_v++);
-                    *(src_y++) = *(dst_y++);
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
+                    *(itl_y++) = *(spl_y++);
                 }
             }
         } else {
-            if (psrc->yuvfmt == YUVFMT_YUYV) {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
                 for (x=0; x<w; ++x) {
-                    *(dst_y++) = *(src_y++);
-                    *(dst_u++) = *(src_y++);
-                    *(dst_y++) = *(src_y++);
-                    *(dst_v++) = *(src_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
                 }
             } else {
                 for (x=0; x<w; ++x) {
-                    *(dst_u++) = *(src_y++);
-                    *(dst_y++) = *(src_y++);
-                    *(dst_v++) = *(src_y++);
-                    *(dst_y++) = *(src_y++);
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
                 }
             }
         }
@@ -1358,9 +1358,9 @@ int main(int argc, char **argv)
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         get_spl_fmt(cfg.src.yuvfmt), BIT_8, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.src.yuvfmt)) {
-                    b8mch_sp2p(psrc, pdst, ITL_2_SPL);
+                    b8mch_sp2p(psrc, pdst, SPLITTING);
                 } else if (cfg.src.yuvfmt == YUVFMT_UYVY || cfg.src.yuvfmt == YUVFMT_YUYV) {
-                    b8mch_yuyv2p(psrc, pdst, ITL_2_SPL);
+                    b8mch_yuyv2p(psrc, pdst, SPLITTING);
                 }
             }
             
@@ -1379,9 +1379,9 @@ int main(int argc, char **argv)
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
                         cfg.dst.yuvfmt, BIT_8, TILE_0, 0, 0);
                 if (is_semi_planar(cfg.dst.yuvfmt)) {
-                    b8mch_sp2p(pdst, psrc, SPL_2_ITL);
+                    b8mch_sp2p(pdst, psrc, INTERLACING);
                 } else if (cfg.dst.yuvfmt == YUVFMT_UYVY  || cfg.dst.yuvfmt == YUVFMT_YUYV ) {
-                    b8mch_yuyv2p(pdst, psrc, SPL_2_ITL);
+                    b8mch_yuyv2p(pdst, psrc, INTERLACING);
                 }
             }
         }
