@@ -200,7 +200,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     }
     
     yuv->io_size = max(io_size, yuv->io_size);
-    assert(yuv->buf_size >= yuv->io_size);
+    assert(!yuv->pbuf || yuv->buf_size >= yuv->io_size);
     
     void show_yuv_prop(yuv_seq_t *yuv);
     //show_yuv_prop(yuv);
@@ -221,7 +221,7 @@ void show_yuv_prop(yuv_seq_t *yuv)
     printf("\n");
     printf("width       = %d\n" , yuv->width     );
     printf("height      = %d\n" , yuv->height    );
-    printf("yuvfmt      = %s\n" , yuv->yuvfmt    );
+    printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
     printf("nlsb        = %d\n" , yuv->nlsb      );
     printf("nbit        = %d\n" , yuv->nbit      );
     printf("btile       = %d\n" , yuv->btile     );
@@ -231,6 +231,7 @@ void show_yuv_prop(yuv_seq_t *yuv)
     printf("uv_size     = %d\n" , yuv->uv_size   );
     printf("io_size     = %d\n" , yuv->io_size   );
     printf("buf_size    = %d\n" , yuv->buf_size  );
+    printf("buf_base    = 0x%08x\n" , yuv->pbuf  );
     
     printf("tile.tw     = %d\n" , yuv->tile.tw   );
     printf("tile.th     = %d\n" , yuv->tile.th   );
