@@ -194,6 +194,21 @@ int ios_open(ios_t ios[], int nch, int *nop)
         ios_t *f = &ios[ch];
         if (f->b_used) 
         {
+            if (strchr(f->mode, 'a') || strchr(f->mode, 'w') || strchr(f->mode, 'r')) 
+            {
+                FILE *fp = fopen(f->path, "r");
+                if (fp) {
+                    char yes_or_no = 0;
+                    fclose(fp); fp =0;
+                    printf("file `%s' already exist, overwrite? (y/n)\n", f->path);
+                    scanf("%c\n", &yes_or_no);
+                    if (yes_or_no != 'y') {
+                        printf("file `%s' would be skipped\n", f->path);
+                        continue;
+                    }
+                }
+            }
+            
             f->fp = fopen(f->path, f->mode);
             if ( f->fp ) {
                 xlog(SLOG_IOS, "@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", 
