@@ -17,6 +17,7 @@
 #include <limits.h>
 #include <string.h>
 #include <malloc.h>
+#include <stdio.h>
 #include <math.h>
 
 #include "yuvdef.h"
@@ -200,7 +201,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     {
         char *arg = argv[i];
         if (arg[0]!='-') {
-            printf("@cmdl>> Err : unrecognized arg `%s`\n", arg);
+            xerr("@cmdl>> unrecognized arg `%s`\n", arg);
             return -i;
         }
         arg += 1;
@@ -231,15 +232,22 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             return -1;
         } else
         if (0==strcmp(arg, "i0")) {
+            char *path;
             seq = &cfg->seq[0];
-            i = arg_parse_str(i, argc, argv, &cfg->seq[0].path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 0, path, "rb");
         } else
         if (0==strcmp(arg, "i1")) {
+            char *path;
             seq = &cfg->seq[1];
-            i = arg_parse_str(i, argc, argv, &cfg->seq[1].path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 1, path, "rb");
         } else
         if (0==strcmp(arg, "o") || 0==strcmp(arg, "diff")) {
-            i = arg_parse_str(i, argc, argv, &cfg->seq[2].path);
+            char *path;
+            seq = &cfg->seq[2];
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, 2, path, "wb");
         } else
         if (0==strcmp(arg, "wxh")) {
             i = arg_parse_wxh(i, argc, argv, &yuv->width, &yuv->height);
@@ -311,7 +319,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     for (i=0; i<2; ++i) 
     {
         yuv_seq_t* psrc = &cfg->seq[i];
-        if (!psrc->path) {
+        if (!cfg->ios[i].path) {
             xerr("@cmdl>> no input %d\n", i);
             return -1;
         }
@@ -339,9 +347,19 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     
+    if (!ios_open(cfg->ios, CMP_IOS_CNT, 0)) {
+        ios_close(cfg->ios, CMP_IOS_CNT);
+        return -1;
+    }
+    
     LEAVE_FUNC();
     
     return 0;
+}
+
+int cmp_arg_close(cmp_opt_t *cfg)
+{
+    ios_close(cfg->ios, CMP_IOS_CNT);
 }
 
 int cmp_arg_help()
@@ -371,6 +389,8 @@ int yuv_cmp(int argc, char **argv)
     
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
+    cmp_arg_init (&cfg, argc, argv);
+    
     r = cmp_arg_parse(&cfg, argc, argv);
     if (r < 0) {
         cmp_arg_help();
@@ -391,15 +411,6 @@ int yuv_cmp(int argc, char **argv)
     
     for (i=0; i<3; ++i) 
     {
-        char *fmode = i<2 ? "rb" : "wb";
-        if (cfg.seq[i].path) {
-            cfg.seq[i].fp = fopen(cfg.seq[i].path, fmode);
-            if ( !cfg.seq[i].fp ) {
-                printf("error : open %s fail\n", cfg.seq[i].path);
-                return -1;
-            }
-        }
-        
         seq[i].buf_size = w_align * h_align * 3 * nbyte;
         seq[i].pbuf = malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
@@ -424,14 +435,14 @@ int yuv_cmp(int argc, char **argv)
         for (i=0; i<2; ++i) 
         {
             set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
-            r=fseek(cfg.seq[i].fp, seq[i].io_size * j, SEEK_SET);
+            r = fseek(cfg.ios[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
                 xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
                 return -1;
             }
-            r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.seq[i].fp);
+            r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.ios[i].fp);
             if (r<1) {
-                if ( feof(cfg.seq[i].fp) ) {
+                if ( ios_feof(cfg.ios, i) ) {
                     xlog(SLOG_L1, "@seq>> $%d: reach file end, force stop\n", i);
                 } else {
                     xerr("@seq>> $%d: error reading file\n", i);
@@ -445,7 +456,7 @@ int yuv_cmp(int argc, char **argv)
             set_yuv_prop_by_copy(ptmp, &seq[3]);
             spl[i] = yuv_cvt_frame(ptmp, &seq[i]);
         }
-        if ( feof(cfg.seq[0].fp) || feof(cfg.seq[1].fp) ) {
+        if ( ios_feof(cfg.ios, 0) || ios_feof(cfg.ios, 1) ) {
             break;
         }
         
@@ -461,8 +472,8 @@ int yuv_cmp(int argc, char **argv)
         psnr = get_stat_psnr(&stat[0]);
         xlog(SLOG_L1, "@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
-        if (cfg.seq[2].fp) {
-            r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
+        if (cfg.ios[2].fp) {
+            r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.ios[2].fp);
             if (r<1) {
                 xerr("error writing file\n");
                 break;
@@ -473,8 +484,8 @@ int yuv_cmp(int argc, char **argv)
     psnr = get_stat_psnr(&stat[1]);
     xlog(SLOG_L0, "@seq>> PSNR = %.2llf\n", psnr);
     
+    cmp_arg_close(&cfg);
     for (i=0; i<3; ++i) {
-        if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);
         if (seq[i].pbuf)    free(seq[i].pbuf);
     }
     

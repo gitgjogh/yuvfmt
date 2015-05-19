@@ -19,9 +19,7 @@
 
 
 #include <stdint.h>
-#include <stdio.h>
 #include "sim_opt.h"
-
 
 #ifndef MAX_PATH
 #define MAX_PATH 256
@@ -114,8 +112,8 @@ typedef struct _yuv_seq
     int     buf_size;
     uint8_t *pbuf;
     
-    char*   path;
-    FILE*   fp;
+    //char*   path;
+    //FILE*   fp;
 
 } yuv_seq_t;
 

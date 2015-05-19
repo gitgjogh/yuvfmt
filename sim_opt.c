@@ -19,7 +19,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "yuvdef.h"
 #include "sim_opt.h"
 
 static slog_t  g_slog_obj = { 0 };
@@ -156,11 +155,13 @@ int xdbg (const char *fmt, ...)
     return r;
 }
 
+
 void iof_cfg(ios_t *f, const char *path, const char *mode)
 {
-    f->b_used = 1;
+    f->b_used = (path && mode);
     if (path) {
-        strncpy(f->path, path, MAX_PATH);
+        strncpy(f->path_buf, path, MAX_PATH);
+        f->path = f->path_buf;
     }
     if (mode) {
         strncpy(f->mode, mode, MAX_MODE);
@@ -172,22 +173,40 @@ void ios_cfg(ios_t *ios, int ch, const char *path, const char *mode)
     iof_cfg(&ios[ch], path, mode);
 }
 
-int ios_open(ios_t *ios, int nch)
+int ios_nused(ios_t *ios, int nch)
 {
     int ch, j;
     for (ch=j=0; ch<nch; ++ch) {
+        j += (!!ios[ch].b_used);
+    }
+    return j;   
+}
+
+/**
+ *  @param [i] ios - array of io description
+ *  @param [o] nop - num of files truely opened
+ *  @return num of files failed to be opened
+ */
+int ios_open(ios_t ios[], int nch, int *nop)
+{
+    int ch, j, n_err;
+    for (ch=j=n_err=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
-        if (f->b_used) {
+        if (f->b_used) 
+        {
             f->fp = fopen(f->path, f->mode);
-            if( f->fp ){
-                xlog(SLOG_IOS, "@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
+            if ( f->fp ) {
+                xlog(SLOG_IOS, "@ios>> ch#%d 0x%08x=fopen(%s, %s)\n", 
+                                        ch, f->fp, f->path, f->mode);
                 ++ j;
             } else {
                 xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+                ++ n_err;
             }
         }
     }
-    return j;   
+    nop ? (*nop = j) : 0;
+    return (n_err==0);   
 }
 
 int ios_close(ios_t *ios, int nch)
@@ -196,13 +215,18 @@ int ios_close(ios_t *ios, int nch)
     for (ch=j=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used && f->fp) {
-            xlog(SLOG_IOS, "@ios>> ch#%d fclose(%s)\n", ch, f->path);
+            xlog(SLOG_IOS, "@ios>> ch#%d fclose(0x%08x: %s)\n", ch, f->fp, f->path);
             fclose(f->fp);
             f->fp = 0;
             ++ j;
         }
     }
     return j;  
+}
+
+int ios_feof(ios_t *p, int ich)
+{
+    return feof((FILE*)p[ich].fp);
 }
 
 char *get_argv(int argc, char *argv[], int i, const char *name)
@@ -274,6 +298,18 @@ int arg_parse_str(int i, int argc, char *argv[], char **p)
 {
     char *arg = GET_ARGV(++ i, "string");
     *p = arg ? arg : 0;
+    return arg ? ++i : -1;
+}
+
+int arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz)
+{
+    char *arg = GET_ARGV(++ i, "string");
+    if (arg) {
+        strncpy(buf, arg, nsz);
+        buf[nsz-1] = 0;
+    } else {
+        buf[0] = 0;
+    }
     return arg ? ++i : -1;
 }
 

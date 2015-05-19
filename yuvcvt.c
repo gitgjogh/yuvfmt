@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <string.h>
 #include <malloc.h>
+#include <stdio.h>
 
 #include "yuvdef.h"
 #include "yuvcvt.h"
@@ -890,12 +891,16 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             return -1;
         } else
         if (0==strcmp(arg, "src")) {
+            char *path = 0;
             seq = &cfg->src;
-            i = arg_parse_str(i, argc, argv, &cfg->src.path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, CVT_IOS_SRC, path, "rb");
         } else
         if (0==strcmp(arg, "dst")) {
+            char *path = 0;
             seq = &cfg->dst;
-            i = arg_parse_str(i, argc, argv, &cfg->dst.path);
+            i = arg_parse_str(i, argc, argv, &path);
+            ios_cfg(cfg->ios, CVT_IOS_DST, path, "wb");
         } else
         if (0==strcmp(arg, "wxh")) {
             i = arg_parse_wxh(i, argc, argv, &seq->width, &seq->height);
@@ -962,8 +967,9 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     
     ENTER_FUNC();
     
-    if (!cfg->src.path || !cfg->dst.path) {
-        printf("@cmdl>> Err : no src or dst\n");
+    if (!cfg->ios[CVT_IOS_DST].path || 
+        !cfg->ios[CVT_IOS_SRC].path) {
+        xerr("@cmdl>> no src or dst\n");
         return -1;
     }
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
@@ -991,9 +997,18 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     psrc->nlsb = psrc->nlsb ? psrc->nlsb : psrc->nbit;
     pdst->nlsb = pdst->nlsb ? pdst->nlsb : pdst->nbit;
     
+    if (!ios_open(cfg->ios, CVT_IOS_CNT, 0)) {
+        ios_close(cfg->ios, CVT_IOS_CNT);
+        return -1;
+    }
     LEAVE_FUNC();
     
     return 0;
+}
+
+int cvt_arg_close(cvt_opt_t *cfg)
+{
+    ios_close(cfg->ios, CVT_IOS_CNT);
 }
 
 int cvt_arg_help()
@@ -1019,6 +1034,8 @@ int yuv_cvt(int argc, char **argv)
 
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
+    cvt_arg_init (&cfg, argc, argv);
+    
     r = cvt_arg_parse(&cfg, argc, argv);
     if (r < 0) {
         cvt_arg_help();
@@ -1029,16 +1046,6 @@ int yuv_cvt(int argc, char **argv)
         printf("\n****src****\n");  show_yuv_prop(&cfg.src);
         printf("\n****dst****\n");  show_yuv_prop(&cfg.dst);
         return 1;
-    }
-    
-    cfg.dst.fp = fopen(cfg.dst.path, "wb");
-    cfg.src.fp = fopen(cfg.src.path, "rb");
-    if( !cfg.dst.fp || !cfg.src.fp )
-    {
-        printf("error : open %s %s fail\n", 
-                cfg.dst.fp ? "" : cfg.dst.path, 
-                cfg.src.fp ? "" : cfg.src.path);
-        return -1;
     }
     
     int w_align = bit_sat(6, cfg.src.width);
@@ -1062,14 +1069,15 @@ int yuv_cvt(int argc, char **argv)
         
         set_yuv_prop_by_copy(&seq[0], &cfg.src);
         
-        r=fseek(cfg.src.fp, seq[0].io_size * i, SEEK_SET);
+        r=fseek(cfg.ios[CVT_IOS_SRC].fp, cfg.src.io_size * i, SEEK_SET);
         if (r) {
             xerr("fseek %d error\n", cfg.src.io_size * i);
             return -1;
         }
-        r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.src.fp);
+        
+        r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
-            if ( feof(cfg.src.fp) ) {
+            if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
                 xlog(SLOG_INFO, "@seq> reach file end, force stop\n");
             } else {
                 xerr("error reading file\n");
@@ -1080,7 +1088,7 @@ int yuv_cvt(int argc, char **argv)
         set_yuv_prop_by_copy(&seq[1], &cfg.dst);
         yuv_seq_t *pdst = yuv_cvt_frame(&seq[1], &seq[0]);
         
-        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst.fp);
+        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.ios[CVT_IOS_DST].fp);
         if (r<1) {
             xerr("error writing file\n");
             break;
@@ -1088,12 +1096,10 @@ int yuv_cvt(int argc, char **argv)
         xlog(SLOG_L1, "@frm> #%d -\n", i);
     } // end frame loop
     
+    cvt_arg_close(&cfg);
     for (i=0; i<2; ++i) {
         if (seq[i].pbuf)    free(seq[i].pbuf);
     }
-    
-    if (cfg.dst.fp)     fclose(cfg.dst.fp);
-    if (cfg.src.fp)     fclose(cfg.src.fp);
 
     return 0;
 }
