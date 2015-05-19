@@ -448,19 +448,16 @@ void b10_linear_unpack(void* b10_base, int n_byte, void* b16_base, int n16)
 /**
  * little endian: 
  *
- *   high (10-rbit)|xxxxxxxxxxxxxx|- rbit -| 
+ *                 |xxxxxxxxxxxxxx|- rbit -| 
  *    bit      high------------------------> low
  *    byte         |  3  |  2  |  1  |  0  | 
- *  
- *                  high (10-rbit)|00000000|- (32-rbit) --|
- *    bit      high------------------------> low
  *  
  */
 void b10_linear_pack(void* b10_base, int n_byte, void* b16_base, int n16)
 {
     uint32_t v16 = 0;
     uint32_t v32 = 0;
-    int rbit = 32;
+    int rbit = 0;
     int i32  = 0;
     int n32  = n_byte >> 2;
     int i16  = 0;
@@ -474,14 +471,14 @@ void b10_linear_pack(void* b10_base, int n_byte, void* b16_base, int n16)
     {
         v16 = pb16[i16++];
         
-        if (rbit<10) {
-            v32   = (v16 & 0x3ff) >> (10 - rbit);               // high rbit
+        if (rbit>22) {
+            v32  += (v16 & 0x3ff) << rbit;                      // low (32-rbit)
             pb10[i32++] = v32;
-            rbit += 22;                                         // rbit=32-(10-rbit)
-            v32   = (v16 & 0x3ff) << rbit;                      // low (10-rbit)
+            v32   = (v16 & 0x3ff) >> (32-rbit);                 // high 10-(32-rbit)
+            rbit -= 22;                                         // rbit=10-(32-rbit)
         } else {
-            v32  += (v16 & 0x3ff) << (rbit - 10);
-            rbit -= 10;
+            v32  += (v16 & 0x3ff) << rbit;
+            rbit += 10;
         }
     }
 }
