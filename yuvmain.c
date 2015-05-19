@@ -19,6 +19,7 @@
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
+#include "yuvfmt.h"
 
 int main(int argc, char **argv)
 {
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
     const static yuv_module_t sub_main[] = {
         {"cvt",     yuv_cvt,    "yuv fmt convertor"},
         {"cmp",     yuv_cmp,    "yuv diff/psnr"},
+        {"fmt",     yuv_fmt,    "another yuvcvt with diff cmdl style"},
     };
 
     xlog_init(SLOG_DBG-1);
@@ -51,7 +53,7 @@ int main(int argc, char **argv)
         }
         if (strcmp(argv[i], "-h") && strcmp(argv[i], "--help")) {
             printf("`%s` is not support. ", argv[i]);
-    }
+        }
     }
     
     printf("Use the following modules:\n");
