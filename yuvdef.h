@@ -37,10 +37,11 @@
 #endif
 
 
+#ifndef ENTER_FUNC
 static int fcall_layer = 0;
 #define ENTER_FUNC  printf("@+++> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
 #define LEAVE_FUNC  printf("@---> %-2d: %s(-)\n", --fcall_layer, __FUNCTION__)
-
+#endif
 
 typedef union _i64_pack {
     uint64_t i64;

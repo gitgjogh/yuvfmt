@@ -17,10 +17,144 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "yuvdef.h"
 #include "sim_opt.h"
 
+static slog_t  g_slog_obj = { 0 };
+// static slog_t *g_slog_ptr = &g_slog_obj;
+
+int clip(int v, int minv, int maxv)
+{
+    v = (v<minv) ? minv : v;
+    v = (v>maxv) ? maxv : v;
+    return v;
+}
+
+#define CLIP(v, minv, maxv)     ((v) = clip((v), (minv), (maxv)))
+
+int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
+{
+    minL = max(minL, SLOG_NON);
+    maxL = min(maxL, SLOG_ALL);
+    if (minL<=maxL) {
+        int level;
+        for (level = minL; level <= maxL; ++level) {
+            sl->fp[level] = fp;
+        }
+        return (maxL - minL + 1);
+    }
+    return 0;
+}
+
+int slog_init(slog_t *sl, int level)
+{
+    memset(sl, 0, sizeof(slog_t));
+    sl->b_inited = 1;
+    if (level != SLOG_NON) { 
+        sl->fp[SLOG_NON] = sl->fp[SLOG_ERR] = stderr;
+        return slog_set_range(sl, SLOG_ERR+1, level, stdout);
+    }
+    return 0;
+}
+
+void slog_reset(slog_t *sl)
+{
+    memset(sl, 0, sizeof(slog_t));
+}
+
+int xlog_set_range(int minL, int maxL, void *fp)
+{
+    return slog_set_range(&g_slog_obj, minL, maxL, fp);
+}
+
+int xlog_init(int level)
+{
+    return slog_init(&g_slog_obj, level);
+}
+
+void xlog_reset()
+{
+    slog_reset(&g_slog_obj);
+}
+
+int xlevel(int level)
+{
+    return slog_init(&g_slog_obj, level);
+}
+
+int slogv(slog_t *sl, int level, const char *prompt, const char *fmt, va_list ap)
+{
+    FILE *fp = 0;
+    if (sl->b_inited) {
+        level = clip(level, SLOG_NON, SLOG_ALL);
+        fp = sl->fp[level];
+    } else {
+        fp = (level <= SLOG_ERR) ? stderr : stdout;
+    }
+    
+    if (fp) {
+        if (prompt) {
+            fprintf(fp, "@%s>> ", prompt);
+        }
+        return vfprintf(fp, fmt, ap);
+    }
+
+    return 0;
+}
+
+int xlogv(int level, const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, level, 0, fmt, ap);
+}
+
+int xerrv(const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, SLOG_ERR, "err", fmt, ap);
+}
+
+int xdbgv(const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, SLOG_DBG, 0, fmt, ap);
+}
+
+int slog (slog_t *sl, int level, const char *prompt, const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = slogv(sl, level, prompt, fmt, ap);
+    va_end(ap);
+    return r;
+}
+int xlog (int level, const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xlogv(level, fmt, ap);
+    va_end(ap);
+    return r;
+}
+int xerr (const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xerrv(fmt, ap);
+    va_end(ap);
+    return r;
+}
+int xdbg (const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xdbgv(fmt, ap);
+    va_end(ap);
+    return r;
+}
 
 void iof_cfg(ios_t *f, const char *path, const char *mode)
 {
