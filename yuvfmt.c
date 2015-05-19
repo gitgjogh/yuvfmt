@@ -284,8 +284,8 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     int th  = tile->tile.th;
     int tsz = tile->tile.tsz;
     int ts  = tile->y_stride;
-    int w   = rect->w_align;
-    int h   = rect->h_align;
+    int w   = rect->width;
+    int h   = rect->height;
     int s   = rect->y_stride;
     uint8_t *pt = tile->pbuf;
     uint8_t *pl = rect->pbuf;
@@ -293,8 +293,8 @@ void b8_tile_2_rect_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     ENTER_FUNC;
     
     assert (tile->nlsb == rect->nlsb);
-    assert (tile->w_align == rect->w_align);
-    assert (tile->h_align == rect->h_align);
+    assert (tile->width == rect->width);
+    assert (tile->height == rect->height);
     
     if (fmt == YUVFMT_400P) {
         b8_tile_2_rect(pt, tw, th, tsz, ts, pl, w, h, s);
@@ -442,8 +442,8 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     int th  = tile->tile.th;
     int tsz = tile->tile.tsz;
     int ts  = tile->y_stride;
-    int w   = rect->w_align;
-    int h   = rect->h_align;
+    int w   = rect->width;
+    int h   = rect->height;
     int s   = rect->y_stride;
     uint8_t *pt = tile->pbuf;
     uint8_t *pl = rect->pbuf;
@@ -451,8 +451,8 @@ void b8_rect_2_tile_mch(yuv_seq_t *tile, yuv_seq_t *rect)
     ENTER_FUNC;
     
     assert (tile->nlsb == rect->nlsb);
-    assert (tile->w_align == rect->w_align);
-    assert (tile->h_align == rect->h_align);
+    assert (tile->width == rect->width);
+    assert (tile->height == rect->height);
     
     if (fmt == YUVFMT_400P) {
         b8_rect_2_tile(pt, tw, th, tsz, ts, pl, w, h, s);
@@ -619,14 +619,14 @@ int b10_rect_unpack_mch(yuv_seq_t *rect10, yuv_seq_t *rect16, int b_pack)
     uint8_t* b16_base   = rect16->pbuf; 
     int b10_stride  = rect10->y_stride; 
     int b16_stride  = rect16->y_stride;
-    int w   = rect10->w_align; 
-    int h   = rect10->h_align; 
+    int w   = rect10->width; 
+    int h   = rect10->height; 
 
     ENTER_FUNC;
     
     assert (rect10->nlsb == rect16->nlsb);
-    assert (rect10->w_align == rect16->w_align);
-    assert (rect10->h_align == rect16->h_align);
+    assert (rect10->width == rect16->width);
+    assert (rect10->height == rect16->height);
     
     if      (fmt == YUVFMT_400P)
     {
@@ -774,8 +774,8 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     int th  = tile10->tile.th;
     int tsz = tile10->tile.tsz;
     int ts  = tile10->y_stride;
-    int w   = rect16->w_align;
-    int h   = rect16->h_align;
+    int w   = rect16->width;
+    int h   = rect16->height;
     int s   = rect16->y_stride;
     uint8_t *pt = tile10->pbuf;
     uint8_t *pl = rect16->pbuf;
@@ -827,21 +827,37 @@ int b10_tile_unpack_mch(yuv_seq_t *tile10, yuv_seq_t *rect16, int b_pack)
     return;
 }
 
-/**
- *  8bit, lama raster, not tiled
- */
-int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, int h_align_bit)
+void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, int stride, int io_size)
 {
-    int fmt = yuv->yuvfmt;
-
     ENTER_FUNC;
     
-    bufw = bit_sat(w_align_bit, bufw);
-    bufh = bit_sat(h_align_bit, bufh);
-    assert( is_bit_aligned(1, bufw) );
-    
-    yuv->y_stride   = bufw;
-    yuv->y_size     = bufw * bufh;
+    yuv->width      = w;
+    yuv->height     = h;
+    yuv->yuvfmt     = fmt;
+    yuv->nlsb       = nlsb;
+    yuv->btile      = btile;
+
+    if (btile) 
+    {
+        tile_t *t = &yuv->tile; 
+        if (yuv->nlsb == 10) { 
+            t->tw = 3; t->th = 4; t->tsz = 16; 
+        } else { 
+            t->tw = 8; t->th = 4; t->tsz = 32; 
+        }
+        
+        yuv->y_stride = sat_div(w, t->tw) * t->tsz;
+        yuv->y_stride = max(stride,  yuv->y_stride);
+        
+        yuv->y_size = yuv->y_stride * sat_div(h, t->th);
+    } 
+    else 
+    {
+        yuv->y_stride = sat_div(yuv->width * yuv->nlsb, 8);
+        yuv->y_stride = max(stride,  yuv->y_stride);
+        
+        yuv->y_size = yuv->y_stride * yuv->height;
+    }
     
     if      (fmt == YUVFMT_400P)
     {
@@ -857,7 +873,7 @@ int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, in
     }
     else if (fmt == YUVFMT_420SP)
     {
-        assert( is_bit_aligned(1, bufh) );
+        assert( is_bit_aligned(1, yuv->height) );
         
         yuv->uv_stride  = yuv->y_stride;
         yuv->uv_size    = yuv->y_size   / 2;
@@ -878,128 +894,7 @@ int set_bufsz_aligned_b8(yuv_seq_t *yuv, int bufw, int bufh, int w_align_bit, in
         yuv->io_size    = yuv->y_size;
     }
     
-    yuv->buf_size = bit_sat(7, yuv->io_size);
-    
-    LEAVE_FUNC;
-
-    return yuv->buf_size;
-}
-
-int set_bufsz_aligned(yuv_seq_t *yuv)
-{
-    ENTER_FUNC;
-
-    set_bufsz_aligned_b8(yuv, yuv->w_align, yuv->h_align, 0, 0);
-    
-    if (yuv->nlsb > 8) {
-        yuv->y_stride   *= 2;
-        yuv->y_size     *= 2;
-        yuv->uv_stride  *= 2;
-        yuv->uv_size    *= 2;
-        yuv->io_size    *= 2;
-        yuv->buf_size   = bit_sat(8, yuv->io_size);
-    }
-    
-    LEAVE_FUNC;
-    
-    return yuv->io_size;
-}
-
-/**
- *  luma raster
- */
-int set_bufsz_src_raster(yuv_seq_t *yuv)
-{
-    int bufw = yuv->w_align;
-    int bufh = yuv->h_align;
-    
-    ENTER_FUNC;
-
-    if (yuv->nlsb == 10) {
-        bufw = bit_sat(2, bufw * 5 / 4);
-    }
-    
-    set_bufsz_aligned_b8(yuv, bufw, bufh, 0, 0);
-    
-    LEAVE_FUNC;
-    
-    return yuv->io_size;
-}
-
-int set_bufsz_src_tile(yuv_seq_t *yuv)
-{
-    ENTER_FUNC;
-    
-    int tw      = 0;
-    int th      = 0;
-    int tsz     = 0; 
-    if (yuv->nlsb == 10) { 
-        tw = 3; th = 4; tsz = 16; 
-    } else { 
-        tw = 8; th = 4; tsz = 32; 
-    }
-    
-    int fmt = yuv->yuvfmt;
-    yuv->tile.tw    = tw;
-    yuv->tile.th    = th;
-    yuv->tile.tsz   = tsz;
-    
-    yuv->y_stride   = sat_div(yuv->w_align, tw) * tsz; 
-    yuv->y_size     = sat_div(yuv->h_align, th) * yuv->y_stride;
-    
-    if      (fmt == YUVFMT_400P)
-    {
-        yuv->uv_stride  = 0;
-        yuv->uv_size    = 0;
-        yuv->io_size    = yuv->y_size;
-    }
-    else if (fmt == YUVFMT_420P)
-    {
-        yuv->uv_stride  = sat_div(yuv->w_align / 2, tw) * tsz;
-        yuv->uv_size    = sat_div(yuv->h_align / 2, th) * yuv->uv_stride;
-        yuv->io_size    = yuv->y_size + 2 * yuv->uv_size;
-    }
-    else if (fmt == YUVFMT_420SP)
-    {
-        yuv->uv_stride  = yuv->y_stride; 
-        yuv->uv_size    = sat_div(yuv->h_align / 2, th) * yuv->uv_stride; 
-        yuv->io_size    = yuv->y_size + yuv->uv_size;
-    }
-    else if (fmt == YUVFMT_422P)  
-    {
-        yuv->uv_stride  = sat_div(yuv->w_align / 2, tw) * tsz;
-        yuv->uv_size    = sat_div(yuv->h_align    , th) * yuv->uv_stride;
-        yuv->io_size    = yuv->y_size + 2 * yuv->uv_size;
-    }
-    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        yuv->y_stride   = sat_div(yuv->w_align * 2, tw) * tsz; 
-        yuv->y_size     = sat_div(yuv->h_align * 2, th) * yuv->y_stride;
-        yuv->uv_stride  = 0;
-        yuv->uv_size    = 0;
-        yuv->io_size    = yuv->y_size;
-    }
-    
-    yuv->buf_size = bit_sat(7, yuv->io_size);
-    
-    LEAVE_FUNC;
-    
-    return yuv->io_size;
-}
-
-void set_seq_info(yuv_seq_t *yuv, int w, int h, int fmt, int nlsb, int btile, int w_align_bit, int h_align_bit)
-{
-    ENTER_FUNC;
-    
-    yuv->width      = w;
-    yuv->height     = h;
-    yuv->w_align    = bit_sat( w_align_bit, yuv->width  );
-    yuv->h_align    = bit_sat( h_align_bit, yuv->height );
-    yuv->yuvfmt     = fmt;
-    yuv->nlsb   = nlsb;
-    yuv->btile      = btile;
-    
-    set_bufsz_aligned(yuv);
+    yuv->io_size = max(io_size, yuv->io_size);
 
     LEAVE_FUNC;
 }
@@ -1009,8 +904,6 @@ void show_yuv_info(yuv_seq_t *yuv)
     printf("\n");
     printf("width       = %d\n" , yuv->width     );
     printf("height      = %d\n" , yuv->height    );
-    printf("w_align     = %d\n" , yuv->w_align   );
-    printf("h_align     = %d\n" , yuv->h_align   );
     printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
     printf("nlsb        = %d\n" , yuv->nlsb      );
     printf("btile       = %d\n" , yuv->btile     );
@@ -1070,14 +963,14 @@ int b16_rect_2_b8_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
     int nlsb        = rect16->nlsb;
     int b16_stride  = rect16->y_stride; 
     int b08_stride  = rect08->y_stride;
-    int w   = rect16->w_align; 
-    int h   = rect16->h_align; 
+    int w   = rect16->width; 
+    int h   = rect16->height; 
 
     ENTER_FUNC;
     
     assert (rect16->yuvfmt  == rect08->yuvfmt);
-    assert (rect16->w_align == rect08->w_align);
-    assert (rect16->h_align == rect08->h_align);
+    assert (rect16->width   == rect08->width);
+    assert (rect16->height  == rect08->height);
     
     if      (fmt == YUVFMT_400P)
     {
@@ -1144,8 +1037,8 @@ int b8mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int src_uv_shift = is_mch_420(src_fmt) ? 0 : psrc->uv_stride;
     int dst_uv_shift = is_mch_420(dst_fmt) ? 0 : pdst->uv_stride;
     
-    int w   = psrc->w_align; 
-    int h   = psrc->h_align; 
+    int w   = psrc->width; 
+    int h   = psrc->height; 
     int y;
 
     ENTER_FUNC;
@@ -1199,8 +1092,8 @@ int b8mch_sp2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2sp)
     uint8_t* dst_u_base = dst_y_base + pdst->y_size;
     uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
     
-    int w   = psrc->w_align; 
-    int h   = psrc->h_align; 
+    int w   = psrc->width; 
+    int h   = psrc->height; 
     int x, y;
 
     ENTER_FUNC;
@@ -1249,8 +1142,8 @@ int b8mch_yuyv2p(yuv_seq_t *psrc, yuv_seq_t *pdst, int b_p2yuyv)
     uint8_t* dst_u_base = dst_y_base + pdst->y_size;
     uint8_t* dst_v_base = dst_u_base + pdst->uv_size;
 
-    int w   = psrc->w_align; 
-    int h   = psrc->h_align; 
+    int w   = psrc->width; 
+    int h   = psrc->height; 
     int x, y;
 
     ENTER_FUNC;
@@ -1311,8 +1204,8 @@ int b8mch_spliting(yuv_seq_t *psrc, yuv_seq_t *pdst)
     ENTER_FUNC;
 
     assert (psrc->nlsb == pdst->nlsb);
-    assert (psrc->w_align == pdst->w_align);
-    assert (psrc->h_align == pdst->h_align);
+    assert (psrc->width == pdst->width);
+    assert (psrc->height == pdst->height);
     assert (pdst->yuvfmt  == get_spl_fmt(fmt));
 
     if (fmt == YUVFMT_400P || fmt == YUVFMT_420P  || fmt == YUVFMT_422P ) {
@@ -1333,9 +1226,16 @@ static int arg_parse(yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_check(yuv_cfg_t *cfg, int argc, char *argv[]);
 static int arg_help()
 {
-    printf("-dst name          [-fmt ?] [-b10] [-btile]\n");
-    printf("-src name [-wxh ?] [-fmt ?] [-b10] [-btile]\n");
-    printf("          [-frame ?] [-stride ?] [-iosize ?]\n");
+    printf("-dst name<%%s> {...yuv props...} \n");
+    printf("-src name<%%s> {...yuv props...} \n");
+    printf("[-frame <%%d>]\n");
+    printf("\n...yuv props...\n");
+    printf("\t [-wxh <%%dx%%d>]\n");
+    printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
+    printf("\t [-stride <%%d>]\n");
+    printf("\t [-fsize <%%d>]\n");
+    printf("\t [-b10]\n");
+    printf("\t [-btile]\n");
     return 0;
 }
 
@@ -1367,14 +1267,14 @@ int main(int argc, char **argv)
     if( !cfg.dst_fp || !cfg.src_fp )
     {
         printf("error : open %s %s fail\n", 
-                cfg.dst_fp ? "" : argv[1], 
-                cfg.src_fp ? "" : argv[2]);
+                cfg.dst_fp ? "" : cfg.dst_path, 
+                cfg.src_fp ? "" : cfg.src_path);
         return -1;
     }
 
-    seq[0].w_align = bit_sat(6, cfg.src.width);
-    seq[0].h_align = bit_sat(6, cfg.src.height);
-    seq[0].buf_size = seq[0].w_align * seq[0].h_align * 4 * 2;
+    seq[0].width = bit_sat(6, cfg.src.width);
+    seq[0].height = bit_sat(6, cfg.src.height);
+    seq[0].buf_size = seq[0].width * seq[0].height * 4 * 2;
     for (i=0; i<2; ++i) {
         seq[i].pbuf = (uint8_t *)malloc(seq[0].buf_size);
         if(!seq[i].pbuf) {
@@ -1394,7 +1294,8 @@ int main(int argc, char **argv)
          *  read one frame
          */
         set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                cfg.src.yuvfmt, cfg.src.nlsb, cfg.src.btile, 0, 0);
+                cfg.src.yuvfmt, cfg.src.nlsb, cfg.src.btile, 
+                cfg.src.y_stride, cfg.src.io_size);
         
         r=fseek(cfg.src_fp, pdst->io_size * i, SEEK_SET);
         if (r) {
@@ -1418,7 +1319,7 @@ int main(int argc, char **argv)
         {
             SWAP_SRC_DST();
             set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                    cfg.src.yuvfmt, BIT_10, TILE_0, 4, 4);
+                    cfg.src.yuvfmt, BIT_10, TILE_0, 0, 0);
             if (cfg.src.btile) {
                 b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
             } else {
@@ -1430,7 +1331,7 @@ int main(int argc, char **argv)
             if (cfg.src.btile) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, TILE_0, 4, 4);
+                        cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
                 b8_tile_2_rect_mch(psrc, pdst);
             }
         }
@@ -1442,13 +1343,13 @@ int main(int argc, char **argv)
             if (cfg.src.nlsb==10 && cfg.dst.nlsb==8) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, TILE_0, 4, 4);
+                        cfg.src.yuvfmt, BIT_8, TILE_0, 0, 0);
                 b16_rect_2_b8_mch(psrc, pdst, B16_2_B8);
             } 
             else if (cfg.src.nlsb==8 && cfg.dst.nlsb==10) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_10, TILE_0, 4, 4);
+                        cfg.src.yuvfmt, BIT_10, TILE_0, 0, 0);
                 b16_rect_2_b8_mch(pdst, psrc, B8_2_B16);
             }
         }
@@ -1500,11 +1401,11 @@ int main(int argc, char **argv)
             SWAP_SRC_DST();
             if (cfg.dst.btile) {
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, TILE_1, 4, 4);
+                        cfg.dst.yuvfmt, BIT_10, TILE_1, 0, 0);
                 b10_tile_unpack_mch(psrc, pdst, B16_2_B10);
             } else {
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, TILE_0, 4, 4);
+                        cfg.dst.yuvfmt, BIT_10, TILE_0, 0, 0);
                 b10_rect_unpack_mch(psrc, pdst, B16_2_B10);
             }
         }
@@ -1513,7 +1414,8 @@ int main(int argc, char **argv)
             if (cfg.dst.btile) {
                 SWAP_SRC_DST();
                 set_seq_info(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_8, TILE_1, 4, 4);
+                        cfg.dst.yuvfmt, BIT_8, TILE_1,
+                        cfg.dst.y_stride, cfg.dst.io_size);
                 b8_rect_2_tile_mch(psrc, pdst);
             }
         }
