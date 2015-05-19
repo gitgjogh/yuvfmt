@@ -369,6 +369,39 @@ int b10_unpack_mch(yuv_seq_t *psrc, yuv_seq_t *pdst)
     return;
 }
 
+int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
+{
+    #define TR_BUF_SIZE 4094
+    static uint8_t tr_buf[TR_BUF_SIZE];
+    uint16_t *tr_base = (uint16_t*)tr_buf;
+    int size_needed = dstw * dsth * sizeof(uint16_t);
+    if (size_needed>TR_BUF_SIZE)
+    {
+        tr_base = (uint16_t*) malloc ( size_needed );
+        if (tr_base==0) {
+            printf("%s : malloc fail!\n", __FUNCTION__);
+            return 0;
+        }
+    }
+    memcpy(tr_base, rect_base, size_needed);
+
+    int x, y;
+    uint16_t* p16_base = (uint16_t*)rect_base;
+    static uint16_t m;
+    for(y=0; y<dsth; ++y)
+    {
+        for(x=0; x<dstw; ++x)
+        {
+            p16_base[y*dstw+x] = tr_base[x*dsth+y];
+        }
+    }
+    
+    if (size_needed>TR_BUF_SIZE)
+    {
+        free(tr_base);
+    }
+}
+
 int b10tile_unpack_planar
 (
     uint8_t* tight_base, int tw, int th, int tsz, int ts, 
@@ -403,6 +436,7 @@ int b10tile_unpack_planar
             uint8_t* dst = &plane_base[s * y + sizeof(uint16_t) * x];
             
             b10_unpack_linear(src, tsz, loose_base, tw*th);
+            b16_rect_transpose(loose_base, tw, th);
             
             b8tile_2_rect(loose_base, tw*2, th, dst, s);
         }
@@ -570,7 +604,7 @@ int set_bufsz_src_raster(yuv_seq_t *yuv)
     ENTER_FUNC;
 
     if (yuv->b10) {
-        bufw = bit_saturate(3, bufw * 5 / 4);
+        bufw = bit_saturate(2, bufw * 5 / 4);
     }
     
     set_bufsz_aligned_b8(yuv, bufw, bufh, 0, 0);
