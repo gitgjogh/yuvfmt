@@ -209,14 +209,14 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int src_uv_shift = is_mch_420(src_fmt) ? 0 : psrc->uv_stride;
     int dst_uv_shift = is_mch_420(dst_fmt) ? 0 : pdst->uv_stride;
     
-    int w   = psrc->width; 
+    int linesize = sat_div(psrc->width * psrc->nbit, 8); 
     int h   = psrc->height; 
     int y;
 
     ENTER_FUNC;
     
     for (y=0; y<h; ++y) {
-        memcpy(dst_y, src_y, w);
+        memcpy(dst_y, src_y, linesize);
         dst_y += pdst->y_stride;
         src_y += psrc->y_stride;
     }
@@ -224,7 +224,7 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     if (src_fmt==YUVFMT_400P || dst_fmt==YUVFMT_400P)
         return 0;
     
-    w   = w/2;
+    linesize /= 2;
     h   = h/2;
     
     for (y=0; y<h; ++y) 
@@ -234,13 +234,13 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
         dst_v += pdst->uv_stride + dst_uv_shift;
         src_v += psrc->uv_stride + src_uv_shift;
         
-        memcpy(dst_u, src_u, w);
-        memcpy(dst_v, src_v, w);
+        memcpy(dst_u, src_u, linesize);
+        memcpy(dst_v, src_v, linesize);
         
         if (dst_uv_shift>0) 
         {
-            memcpy(dst_u + dst_uv_shift, src_u + src_uv_shift, w);
-            memcpy(dst_v + dst_uv_shift, src_v + src_uv_shift, w);
+            memcpy(dst_u + dst_uv_shift, src_u + src_uv_shift, linesize);
+            memcpy(dst_v + dst_uv_shift, src_v + src_uv_shift, linesize);
         }
     }
     
@@ -328,6 +328,131 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
         uint8_t* spl_y  = spl_y_base + y * spl->y_stride;
         uint8_t* spl_u  = spl_u_base + y * spl->uv_stride;
         uint8_t* spl_v  = spl_v_base + y * spl->uv_stride;
+
+        if (b_interlacing == INTERLACING) {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(itl_y++) = *(spl_u++);
+                    *(itl_y++) = *(spl_y++);
+                    *(itl_y++) = *(spl_v++);
+                    *(itl_y++) = *(spl_y++);
+                }
+            }
+        } else {
+            if (itl->yuvfmt == YUVFMT_YUYV) {
+                for (x=0; x<w; ++x) {
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
+                }
+            } else {
+                for (x=0; x<w; ++x) {
+                    *(spl_u++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                    *(spl_v++) = *(itl_y++);
+                    *(spl_y++) = *(itl_y++);
+                }
+            }
+        }
+    }   /* end for y*/
+
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+int b16_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+{
+    return b8_mch_p2p(psrc, pdst);
+}
+
+/**
+ *  @itl : uv is interlaced (here 420sp)
+ *  @spl : uv is splitted
+ */
+int b16_mch_sp2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
+{
+    int fmt = itl->yuvfmt;
+    
+    uint8_t* itl_y_base = itl->pbuf;
+    uint8_t* itl_u_base = itl_y_base + itl->y_size;
+    
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
+    
+    int w   = itl->width; 
+    int h   = itl->height; 
+    int x, y;
+
+    ENTER_FUNC;
+    
+    for (y=0; y<h; ++y) {
+        uint16_t* itl_y = (uint16_t*)(itl_y_base + y * itl->y_stride);
+        uint16_t* spl_y = (uint16_t*)(spl_y_base + y * spl->y_stride);
+        memcpy(spl_y, itl_y, w*sizeof(uint16_t));
+    }
+
+    w   = w/2;
+    h   = is_mch_422(fmt) ? h : h/2;
+    
+    for (y=0; y<h; ++y) {
+        uint16_t* itl_u = (uint16_t*)(itl_u_base + y * itl->uv_stride);
+        uint16_t* spl_u = (uint16_t*)(spl_u_base + y * spl->uv_stride);
+        uint16_t* spl_v = (uint16_t*)(spl_v_base + y * spl->uv_stride);
+
+        if (b_interlacing == INTERLACING) {
+            for (x=0; x<w; ++x) {
+                *(itl_u++) = *(spl_u++);
+                *(itl_u++) = *(spl_v++);
+            }
+        } else {
+            for (x=0; x<w; ++x) {
+                *(spl_u++) = *(itl_u++);
+                *(spl_v++) = *(itl_u++);
+            }
+        }
+    }
+    
+    LEAVE_FUNC;
+    
+    return 0;
+}
+
+/**
+ *  @itl : luma & chroma is interlaced (here uyvy or yuyv)
+ *  @spl : luma & chroma is splitted
+ */
+int b16_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
+{
+    uint8_t* itl_y_base = itl->pbuf;
+    
+    uint8_t* spl_y_base = spl->pbuf;
+    uint8_t* spl_u_base = spl_y_base + spl->y_size;
+    uint8_t* spl_v_base = spl_u_base + spl->uv_size;
+
+    int w   = itl->width; 
+    int h   = itl->height; 
+    int x, y;
+
+    ENTER_FUNC;
+
+    w   = w/2;
+
+    for (y=0; y<h; ++y) 
+    {
+        uint16_t* itl_y = (uint16_t*)(itl_y_base + y * itl->y_stride );
+        uint16_t* spl_y = (uint16_t*)(spl_y_base + y * spl->y_stride );
+        uint16_t* spl_u = (uint16_t*)(spl_u_base + y * spl->uv_stride);
+        uint16_t* spl_v = (uint16_t*)(spl_v_base + y * spl->uv_stride);
 
         if (b_interlacing == INTERLACING) {
             if (itl->yuvfmt == YUVFMT_YUYV) {
