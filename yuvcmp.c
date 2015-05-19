@@ -17,11 +17,18 @@
 #include <limits.h>
 #include <string.h>
 #include <malloc.h>
+#include <math.h>
 
 #include "yuvdef.h"
 #include "yuvcvt.h"
 #include "yuvcmp.h"
 #include "yuvopt.h"
+
+
+double get_stat_psnr(dstat_t *s)
+{
+    return 10.0 * log(s->ssd / ((double)65025 * s->cnt) ) / log(10.0);
+}
 
 
 dstat_t b8_rect_diff(int w, int h, uint8_t *base[3], 
@@ -284,6 +291,9 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
 {
     int i = 0;
     yuv_seq_t* yuv = &cfg->seq[0];
+    
+    ENTER_FUNC;
+    
     for (i=0; i<2; ++i) 
     {
         yuv_seq_t* psrc = &cfg->seq[i];
@@ -337,7 +347,7 @@ int cmp_arg_help()
 
 int yuv_cmp(int argc, char **argv)
 {
-    int         r, i;
+    int         r, i, j;
     cmp_opt_t   cfg;
     yuv_seq_t   seq[4];
     yuv_seq_t*  spl[2];
@@ -363,12 +373,16 @@ int yuv_cmp(int argc, char **argv)
     int h_align = bit_sat(6, cfg.seq[0].height);
     int nbyte   = 1 + (cfg.seq[0].nbit > 8 || cfg.seq[1].nbit > 8);
     char* fm[3] = {"rb", "rb", "wb"};
+    
     for (i=0; i<3; ++i) 
     {
-        cfg.seq[i].fp = fopen(cfg.seq[i].path, "rb");
-        if ( !cfg.seq[i].fp ) {
-            printf("error : open %s fail\n", cfg.seq[i].path);
-            return -1;
+        char *fmode = i<2 ? "rb" : "wb";
+        if (cfg.seq[i].path) {
+            cfg.seq[i].fp = fopen(cfg.seq[i].path, fmode);
+            if ( !cfg.seq[i].fp ) {
+                printf("error : open %s fail\n", cfg.seq[i].path);
+                return -1;
+            }
         }
         
         seq[i].buf_size = w_align * h_align * 3 * nbyte;
@@ -388,33 +402,36 @@ int yuv_cmp(int argc, char **argv)
     /*************************************************************************
      *                          frame loop
      ************************************************************************/
-    for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
+    for (j=cfg.frame_range[0]; j<cfg.frame_range[1]; j++) 
     {
-        printf("\n@frm> **** %d ****\n", i);
+        printf("\n@frm> **** %d ****\n", j);
 
         for (i=0; i<2; ++i) 
         {
             set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
-            r=fseek(cfg.seq[i].fp, seq[i].io_size * i, SEEK_SET);
+            r=fseek(cfg.seq[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
-                printf("%d: fseek %d error\n", i, seq[i].io_size * i);
+                printf("%d: fseek %d error\n", i, seq[i].io_size * j);
                 return -1;
             }
             r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.seq[i].fp);
             if (r<1) {
                 if ( feof(cfg.seq[i].fp) ) {
-                    printf("%d: reach file end, force stop\n", i);
+                    printf("@seq>> $%d: reach file end, force stop\n", i);
                 } else {
-                    printf("%d: error reading file\n", i);
+                    printf("@seq>> $%d: error reading file\n", i);
                 }
                 break;
             }
             
             // get one buffer unused
             ptmp = (i==0) ? &seq[2] : 
-                            (spl[0] == &seq[0] ? &seq[1] : &seq[0]);
+                            (spl[0] == &seq[0] ? &seq[2] : &seq[0]);
             set_yuv_prop_by_copy(ptmp, &seq[3]);
-            yuv_cvt_frame(ptmp, &seq[i]);
+            spl[i] = yuv_cvt_frame(ptmp, &seq[i]);
+        }
+        if ( feof(cfg.seq[0].fp) || feof(cfg.seq[1].fp) ) {
+            break;
         }
         
         for (i=0; i<3; ++i) {
@@ -426,6 +443,13 @@ int yuv_cmp(int argc, char **argv)
         set_yuv_prop_by_copy(ptmp, &seq[3]);
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
+        if (stat[0].ssd == 0) {
+            printf("@frm>> #%d: the two frame is the same\n", j);
+        } else {
+            double psnr = get_stat_psnr(&stat[0]);
+            printf("@frm>> #%d: PSNR = %.2d\n", j, psnr);
+        }
+        
         if (cfg.seq[2].fp) {
             r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
             if (r<1) {
@@ -435,10 +459,17 @@ int yuv_cmp(int argc, char **argv)
         }
     }
     
+    if (stat[1].ssd == 0) {
+        printf("@seq>> the two file is the same\n");
+    } else {
+        double psnr = get_stat_psnr(&stat[1]);
+        printf("@seq>> PSNR = %.2d\n", psnr);
+    }
+    
     for (i=0; i<3; ++i) {
         if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);
         if (seq[i].pbuf)    free(seq[i].pbuf);
     }
     
-    return 0;
+    return !!stat[1].ssd;
 }

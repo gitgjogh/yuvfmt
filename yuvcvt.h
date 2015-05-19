@@ -49,6 +49,8 @@ typedef struct _yuv_cvt_opt
     
 } cvt_opt_t;
 
+yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc);
+
 int cvt_arg_init (cvt_opt_t *cfg, int argc, char *argv[]);
 int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[]);
 int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[]);
