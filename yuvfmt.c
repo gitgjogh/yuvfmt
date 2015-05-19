@@ -471,7 +471,7 @@ void b10_linear_pack(void* b10_base, int n_byte, void* b16_base, int n16)
     {
         v16 = pb16[i16++];
         
-        if (rbit>22) {
+        if (rbit>=22) {
             v32  += (v16 & 0x3ff) << rbit;                      // low (32-rbit)
             pb10[i32++] = v32;
             v32   = (v16 & 0x3ff) >> (32-rbit);                 // high 10-(32-rbit)
