@@ -139,7 +139,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
                     int stride, int io_size);
                     
 void set_yuv_prop_by_copy(yuv_seq_t *dst, int b_realloc, yuv_seq_t *src);
-void show_yuv_prop(yuv_seq_t *yuv);
+void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt);
 int  yuv_buf_realloc(yuv_seq_t *yuv, int buf_size);
 void yuv_buf_free(yuv_seq_t *yuv);
 

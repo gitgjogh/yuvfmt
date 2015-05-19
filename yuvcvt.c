@@ -1002,8 +1002,8 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     pdst->height = psrc->height;
     set_yuv_prop_by_copy(psrc, 0, psrc);
     set_yuv_prop_by_copy(pdst, 0, pdst);
-    show_yuv_prop(psrc);
-    show_yuv_prop(pdst);
+    show_yuv_prop(psrc, SLOG_CFG, "@cfg>> src: ");
+    show_yuv_prop(pdst, SLOG_CFG, "@cfg>> dst: ");
     
     LEAVE_FUNC();
     

@@ -247,25 +247,34 @@ void yuv_buf_free(yuv_seq_t *yuv)
     }   
 }
 
-void show_yuv_prop(yuv_seq_t *yuv)
+void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
 {
-    printf("\n");
-    printf("width       = %d\n" , yuv->width     );
-    printf("height      = %d\n" , yuv->height    );
-    printf("yuvfmt      = %d\n" , yuv->yuvfmt    );
-    printf("nlsb        = %d\n" , yuv->nlsb      );
-    printf("nbit        = %d\n" , yuv->nbit      );
-    printf("btile       = %d\n" , yuv->btile     );
-    printf("y_stride    = %d\n" , yuv->y_stride  );
-    printf("uv_stride   = %d\n" , yuv->uv_stride );
-    printf("y_size      = %d\n" , yuv->y_size    );
-    printf("uv_size     = %d\n" , yuv->uv_size   );
-    printf("io_size     = %d\n" , yuv->io_size   );
-    printf("buf_size    = %d\n" , yuv->buf_size  );
-    printf("buf_base    = 0x%08x\n" , yuv->pbuf  );
+#define XTR_X(v) xlog(level, #v "=0x%08x, ", yuv->v)
+#define XTR_I(v) xlog(level, #v "=%d, ", yuv->v)
+
+    const char* show_fmt(int ifmt);
+
+    xlog(level, "%s@0x%08x : {", SAFE_STR(prompt,""), yuv); 
+    if (!yuv) {
+        return;
+    }
     
-    printf("tile.tw     = %d\n" , yuv->tile.tw   );
-    printf("tile.th     = %d\n" , yuv->tile.th   );
-    printf("tile.tsz    = %d\n" , yuv->tile.tsz  );
-    printf("\n");
+    XTR_I(width     );
+    XTR_I(height    );
+    XTR_I(yuvfmt    );
+    XTR_I(nlsb      );
+    XTR_I(nbit      );
+    XTR_I(btile     );
+    XTR_I(y_stride  );
+    XTR_I(uv_stride );
+    XTR_I(y_size    );
+    XTR_I(uv_size   );
+    XTR_I(io_size   );
+    XTR_I(buf_size  );
+    XTR_X(pbuf      );
+    XTR_I(tile.tw   );
+    XTR_I(tile.th   );
+    XTR_I(tile.tsz  );
+    
+    xlog(level, "}\n");
 }

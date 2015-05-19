@@ -350,7 +350,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     for (i=0; i<3; ++i) {
         set_yuv_prop_by_copy(&cfg->seq[i], 0, &cfg->seq[i]);
         xlog(SLOG_CFG, "@cfg> yuv#%d: ", i);  
-        show_yuv_prop(&cfg->seq[i]);
+        show_yuv_prop(&cfg->seq[i], SLOG_CFG, 0);
     }
     
     LEAVE_FUNC();
@@ -408,7 +408,7 @@ int yuv_cmp(int argc, char **argv)
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             TILE_0, 0, 0);
-    show_yuv_prop(&seq[3]);
+    show_yuv_prop(&seq[3], SLOG_DBG, "@cfg>> mid type: ");
 
     /*************************************************************************
      *                          frame loop
