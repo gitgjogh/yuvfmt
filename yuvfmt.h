@@ -101,6 +101,9 @@ typedef struct _yuv_seq
     int     io_size;
     int     buf_size;
     uint8_t *pbuf;
+    
+    char*   path;
+    void*   fp;
 
 } yuv_seq_t;
 
@@ -108,12 +111,7 @@ typedef struct _yuv_cvt_opt
 {
     int     frame_range[2];
 
-    char*       src_path;
-    FILE*       src_fp;
     yuv_seq_t   src;
-
-    char*       dst_path;
-    FILE*       dst_fp;
     yuv_seq_t   dst;
     
 } cvt_opt_t;
@@ -121,6 +119,8 @@ typedef struct _yuv_cvt_opt
 typedef struct _yuv_cmp_opt
 {
     yuv_seq_t   seq[3];     /* src1,src2,diff */
+    int         blksz;
+    int     frame_range[2];
     
 } cmp_opt_t;
 

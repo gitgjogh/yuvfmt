@@ -1349,6 +1349,14 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     return;
 }
 
+void set_yuv_prop_by_copy(yuv_seq_t *dst, yuv_seq_t *src)
+{
+    return set_yuv_prop(dst, 
+            src->width, src->height, src->yuvfmt, 
+            src->nbit,  src->nlsb,   src->btile, 
+            src->y_stride, src->io_size);
+}
+
 void show_yuv_prop(yuv_seq_t *yuv)
 {
     printf("\n");
@@ -1389,15 +1397,155 @@ static int cvt_arg_help()
     return 0;
 }
 
+yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
+{
+    yuv_seq_t cfg_src, cfg_dst;
+    memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
+    memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
+    
+    #define SWAP_SRC_DST()  do { \
+        yuv_seq_t *ptmp=psrc; psrc=pdst; pdst=ptmp; \
+    } while(0)
+    
+    /**
+     *  b10-untile/unpack, b8-untile
+     */
+    if (cfg_src.nbit==10) 
+    {
+        SWAP_SRC_DST();
+        set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                cfg_src.yuvfmt, BIT_16, BIT_10, TILE_0, 0, 0);
+        if (cfg_src.btile) {
+            b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
+        } else {
+            b10_rect_unpack_mch(psrc, pdst, B10_2_B16);
+        }
+    } 
+    else if (cfg_src.nbit==8)
+    {
+        if (cfg_src.btile) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
+            b8_tile_2_rect_mch(psrc, pdst, TILE2RECT);
+        }
+    }
+
+    /**
+     *  bit-shift
+     */
+    if (pdst->nbit != cfg_dst.nbit) {
+        if (pdst->nbit==16 && cfg_dst.nbit==8) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
+            b16_n_b8_cvt_mch(psrc, pdst, B16_2_B8);
+        } 
+        else if (pdst->nbit==8 && cfg_dst.nbit>8) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_src.yuvfmt, BIT_16, cfg_dst.nbit, TILE_0, 0, 0);
+            pdst->nlsb = cfg_dst.nlsb;
+            b16_n_b8_cvt_mch(pdst, psrc, B8_2_B16);
+        }
+    } else if (cfg_dst.nbit == 16) {
+        if (pdst->nlsb != cfg_dst.nlsb) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_src.yuvfmt, BIT_16, BIT_16, TILE_0, 0, 0);
+            b16_mch_scale(psrc, pdst);
+        } 
+    }
+
+    /**
+     * fmt convertion.
+     */        
+    if (cfg_src.yuvfmt != cfg_dst.yuvfmt) 
+    {
+        int nbit = pdst->nbit;
+        int nlsb = pdst->nlsb;
+        assert(nbit == 8 || nbit == 16);
+        int (*mch_p2p   )(yuv_seq_t*, yuv_seq_t*);
+        int (*mch_sp2p  )(yuv_seq_t*, yuv_seq_t*, int);
+        int (*mch_yuyv2p)(yuv_seq_t*, yuv_seq_t*, int);
+        mch_p2p    = (nbit==8) ? b8_mch_p2p    : b16_mch_p2p    ;
+        mch_sp2p   = (nbit==8) ? b8_mch_sp2p   : b16_mch_sp2p   ;
+        mch_yuyv2p = (nbit==8) ? b8_mch_yuyv2p : b16_mch_yuyv2p ;
+
+        // uv de-interlace
+        if (cfg_src.yuvfmt != get_spl_fmt(cfg_src.yuvfmt)) { 
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    get_spl_fmt(cfg_src.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
+            if (is_semi_planar(cfg_src.yuvfmt)) {
+                mch_sp2p(psrc, pdst, SPLITTING);
+            } else if (cfg_src.yuvfmt == YUVFMT_UYVY || cfg_src.yuvfmt == YUVFMT_YUYV) {
+                mch_yuyv2p(psrc, pdst, SPLITTING);
+            }
+        }
+        
+        // uv re-sample
+        if (get_spl_fmt(cfg_src.yuvfmt) != get_spl_fmt(cfg_dst.yuvfmt))
+        {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
+            mch_p2p(psrc, pdst); 
+        }
+
+        // uv interlace
+        if (cfg_dst.yuvfmt != get_spl_fmt(cfg_dst.yuvfmt)) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_dst.yuvfmt, nbit, nlsb, TILE_0, 0, 0);
+            if (is_semi_planar(cfg_dst.yuvfmt)) {
+                mch_sp2p(pdst, psrc, INTERLACING);
+            } else if (cfg_dst.yuvfmt == YUVFMT_UYVY  || cfg_dst.yuvfmt == YUVFMT_YUYV ) {
+                mch_yuyv2p(pdst, psrc, INTERLACING);
+            }
+        }
+    }
+
+    /**
+     *  b10-tile/pack, b8-tile
+     */
+    if (cfg_dst.nbit==10) 
+    {
+        SWAP_SRC_DST();
+        if (cfg_dst.btile) {
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_1, 0, 0);
+            b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
+        } else {
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_0, 0, 0);
+            b10_rect_unpack_mch(pdst, psrc, B16_2_B10);
+        }
+    }
+    else if (cfg_dst.nbit==8)
+    {
+        if (cfg_dst.btile) {
+            SWAP_SRC_DST();
+            set_yuv_prop(pdst, cfg_src.width, cfg_src.height, 
+                    cfg_dst.yuvfmt, BIT_8, BIT_8, TILE_1,
+                    cfg_dst.y_stride, cfg_dst.io_size);
+            b8_tile_2_rect_mch(pdst, psrc, RECT2TILE);
+        }
+    }
+    else if (cfg_dst.nbit==16)
+    {
+        //TODO: 
+    }
+    
+    return pdst;
+}
+
 int yuv_cvt(int argc, char **argv)
 {
     int         r, i;
     cvt_opt_t   cfg;
     yuv_seq_t   seq[2];
-    yuv_seq_t   *psrc = &seq[0];
-    yuv_seq_t   *pdst = &seq[1];
-    #define SWAP_SRC_DST()  do { yuv_seq_t *ptmp=psrc; psrc=pdst; pdst=ptmp; } while(0)
-    
+
     memset(seq, 0, sizeof(seq));
     memset(&cfg, 0, sizeof(cfg));
     r = cvt_arg_parse(&cfg, argc, argv);
@@ -1412,26 +1560,27 @@ int yuv_cvt(int argc, char **argv)
         return 1;
     }
     
-    cfg.dst_fp = fopen(cfg.dst_path, "wb");
-    cfg.src_fp = fopen(cfg.src_path, "rb");
-    if( !cfg.dst_fp || !cfg.src_fp )
+    cfg.dst.fp = fopen(cfg.dst.path, "wb");
+    cfg.src.fp = fopen(cfg.src.path, "rb");
+    if( !cfg.dst.fp || !cfg.src.fp )
     {
         printf("error : open %s %s fail\n", 
-                cfg.dst_fp ? "" : cfg.dst_path, 
-                cfg.src_fp ? "" : cfg.src_path);
+                cfg.dst.fp ? "" : cfg.dst.path, 
+                cfg.src.fp ? "" : cfg.src.path);
         return -1;
     }
-
+    
+    int w_align = bit_sat(6, cfg.src.width);
+    int h_align = bit_sat(6, cfg.src.height);
+    int nbyte   = 1 + (cfg.src.nbit > 8 || cfg.src.nbit > 8);
     for (i=0; i<2; ++i) {
-        seq[i].width = bit_sat(6, cfg.src.width);
-        seq[i].height = bit_sat(6, cfg.src.height);
-        seq[i].buf_size = seq[i].width * seq[i].height * 4 * 2;
+        seq[i].buf_size = w_align * h_align * 3 * nbyte;
         seq[i].pbuf = (uint8_t *)malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
             printf("error: malloc seq[%d] fail\n", i);
             return -1;
         }
-    }    
+    }
 
     /*************************************************************************
      *                          frame loop
@@ -1440,21 +1589,16 @@ int yuv_cvt(int argc, char **argv)
     {
         printf("\n@frm> **** %d ****\n", i);
         
-        /**
-         *  read one frame
-         */
-        set_yuv_prop(pdst, cfg.src.width, cfg.src.height, cfg.src.yuvfmt, 
-                cfg.src.nbit, cfg.src.nlsb, cfg.src.btile, 
-                cfg.src.y_stride, cfg.src.io_size);
+        set_yuv_prop_by_copy(&seq[0], &cfg.src);
         
-        r=fseek(cfg.src_fp, pdst->io_size * i, SEEK_SET);
+        r=fseek(cfg.src.fp, seq[0].io_size * i, SEEK_SET);
         if (r) {
-            printf("fseek %d error\n", pdst->io_size * i);
+            printf("fseek %d error\n", seq[0].io_size * i);
             return -1;
         }
-        r = fread(pdst->pbuf, pdst->io_size, 1, cfg.src_fp);
+        r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.src.fp);
         if (r<1) {
-            if ( feof(cfg.src_fp) ) {
+            if ( feof(cfg.src.fp) ) {
                 printf("reach file end, force stop\n");
             } else {
                 printf("error reading file\n");
@@ -1462,138 +1606,10 @@ int yuv_cvt(int argc, char **argv)
             break;
         }
         
-        /**
-         *  b10-untile/unpack, b8-untile
-         */
-        if (cfg.src.nbit==10) 
-        {
-            SWAP_SRC_DST();
-            set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                    cfg.src.yuvfmt, BIT_16, BIT_10, TILE_0, 0, 0);
-            if (cfg.src.btile) {
-                b10_tile_unpack_mch(psrc, pdst, B10_2_B16);
-            } else {
-                b10_rect_unpack_mch(psrc, pdst, B10_2_B16);
-            }
-        } 
-        else if (cfg.src.nbit==8)
-        {
-            if (cfg.src.btile) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
-                b8_tile_2_rect_mch(psrc, pdst, TILE2RECT);
-            }
-        }
-
-        /**
-         *  bit-shift
-         */
-        if (pdst->nbit != cfg.dst.nbit) {
-            if (pdst->nbit==16 && cfg.dst.nbit==8) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_8, BIT_8, TILE_0, 0, 0);
-                b16_n_b8_cvt_mch(psrc, pdst, B16_2_B8);
-            } 
-            else if (pdst->nbit==8 && cfg.dst.nbit>8) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_16, cfg.dst.nbit, TILE_0, 0, 0);
-                pdst->nlsb = cfg.dst.nlsb;
-                b16_n_b8_cvt_mch(pdst, psrc, B8_2_B16);
-            }
-        } else if (cfg.dst.nbit == 16) {
-            if (pdst->nlsb != cfg.dst.nlsb) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.src.yuvfmt, BIT_16, BIT_16, TILE_0, 0, 0);
-                b16_mch_scale(psrc, pdst);
-            } 
-        }
-
-        /**
-         * fmt convertion. TODO: nbit==BIT_16 support
-         */        
-        if (cfg.src.yuvfmt != cfg.dst.yuvfmt) 
-        {
-            int nbit = pdst->nbit;
-            int nlsb = pdst->nlsb;
-            assert(nbit == 8 || nbit == 16);
-            int (*mch_p2p   )(yuv_seq_t*, yuv_seq_t*);
-            int (*mch_sp2p  )(yuv_seq_t*, yuv_seq_t*, int);
-            int (*mch_yuyv2p)(yuv_seq_t*, yuv_seq_t*, int);
-            mch_p2p    = (nbit==8) ? b8_mch_p2p    : b16_mch_p2p    ;
-            mch_sp2p   = (nbit==8) ? b8_mch_sp2p   : b16_mch_sp2p   ;
-            mch_yuyv2p = (nbit==8) ? b8_mch_yuyv2p : b16_mch_yuyv2p ;
-
-            // uv de-interlace
-            if (cfg.src.yuvfmt != get_spl_fmt(cfg.src.yuvfmt)) { 
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        get_spl_fmt(cfg.src.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
-                if (is_semi_planar(cfg.src.yuvfmt)) {
-                    mch_sp2p(psrc, pdst, SPLITTING);
-                } else if (cfg.src.yuvfmt == YUVFMT_UYVY || cfg.src.yuvfmt == YUVFMT_YUYV) {
-                    mch_yuyv2p(psrc, pdst, SPLITTING);
-                }
-            }
-            
-            // uv re-sample
-            if (get_spl_fmt(cfg.src.yuvfmt) != get_spl_fmt(cfg.dst.yuvfmt))
-            {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        get_spl_fmt(cfg.dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
-                mch_p2p(psrc, pdst); 
-            }
-
-            // uv interlace
-            if (cfg.dst.yuvfmt != get_spl_fmt(cfg.dst.yuvfmt)) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, nbit, nlsb, TILE_0, 0, 0);
-                if (is_semi_planar(cfg.dst.yuvfmt)) {
-                    mch_sp2p(pdst, psrc, INTERLACING);
-                } else if (cfg.dst.yuvfmt == YUVFMT_UYVY  || cfg.dst.yuvfmt == YUVFMT_YUYV ) {
-                    mch_yuyv2p(pdst, psrc, INTERLACING);
-                }
-            }
-        }
-
-        /**
-         *  b10-tile/pack, b8-tile
-         */
-        if (cfg.dst.nbit==10) 
-        {
-            SWAP_SRC_DST();
-            if (cfg.dst.btile) {
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, BIT_10, TILE_1, 0, 0);
-                b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
-            } else {
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_10, BIT_10, TILE_0, 0, 0);
-                b10_rect_unpack_mch(pdst, psrc, B16_2_B10);
-            }
-        }
-        else if (cfg.dst.nbit==8)
-        {
-            if (cfg.dst.btile) {
-                SWAP_SRC_DST();
-                set_yuv_prop(pdst, cfg.src.width, cfg.src.height, 
-                        cfg.dst.yuvfmt, BIT_8, BIT_8, TILE_1,
-                        cfg.dst.y_stride, cfg.dst.io_size);
-                b8_tile_2_rect_mch(pdst, psrc, RECT2TILE);
-            }
-        }
-        else if (cfg.dst.nbit==16)
-        {
-            //TODO: 
-        }
+        set_yuv_prop_by_copy(&seq[1], &cfg.dst);
+        yuv_seq_t *pdst = yuv_cvt_frame(&seq[1], &seq[0]);
         
-        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst_fp);
-      
+        r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst.fp);
         if (r<1) {
             printf("error writing file\n");
             break;
@@ -1604,8 +1620,8 @@ int yuv_cvt(int argc, char **argv)
         if (seq[i].pbuf)    free(seq[i].pbuf);
     }
     
-    if (cfg.dst_fp)     fclose(cfg.dst_fp);
-    if (cfg.src_fp)     fclose(cfg.src_fp);
+    if (cfg.dst.fp)     fclose(cfg.dst.fp);
+    if (cfg.src.fp)     fclose(cfg.src.fp);
 
     return 0;
 }
@@ -1808,11 +1824,11 @@ static int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         } else
         if (0==strcmp(arg, "src")) {
             seq = &cfg->src;
-            i = arg_parse_str(i, argc, argv, &cfg->src_path);
+            i = arg_parse_str(i, argc, argv, &cfg->src.path);
         } else
         if (0==strcmp(arg, "dst")) {
             seq = &cfg->dst;
-            i = arg_parse_str(i, argc, argv, &cfg->dst_path);
+            i = arg_parse_str(i, argc, argv, &cfg->dst.path);
         } else
         if (0==strcmp(arg, "wxh")) {
             i = arg_parse_wxh(i, argc, argv, seq);
@@ -1867,7 +1883,7 @@ static int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     
     ENTER_FUNC;
     
-    if (!cfg->src_path || !cfg->dst_path) {
+    if (!cfg->src.path || !cfg->dst.path) {
         printf("@cmdl>> Err : no src or dst\n");
         return -1;
     }
@@ -1923,7 +1939,56 @@ static int cmp_arg_help()
 
 int yuv_cmp(int argc, char **argv)
 {
-    printf("It's a dummy module.");
+    int         r, i;
+    cmp_opt_t   cfg;
+    yuv_seq_t   seq[3];
+    
+    memset(seq, 0, sizeof(seq));
+    memset(&cfg, 0, sizeof(cfg));
+    r = cmp_arg_parse(&cfg, argc, argv);
+    if (r < 0) {
+        cvt_arg_help();
+        return 1;
+    }
+    r = cmp_arg_check(&cfg, argc, argv);
+    if (r < 0) {
+        printf("\n****src1****\n");  show_yuv_prop(&cfg.seq[0]);
+        printf("\n****src2****\n");  show_yuv_prop(&cfg.seq[1]);
+        printf("\n****diff****\n");  show_yuv_prop(&cfg.seq[2]);
+        return 1;
+    }
+
+    int w_align = bit_sat(6, cfg.seq[0].width);
+    int h_align = bit_sat(6, cfg.seq[0].height);
+    int nbyte   = 1 + (cfg.seq[0].nbit > 8 || cfg.seq[1].nbit > 8);
+    for (i=0; i<2; ++i) 
+    {
+        cfg.seq[i].fp = fopen(cfg.seq[i].path, "rb");
+        if ( !cfg.seq[i].fp ) {
+            printf("error : open %s fail\n", cfg.seq[i].path);
+            return -1;
+        }
+        
+        seq[i].buf_size = w_align * h_align * 3 * nbyte;
+        seq[i].pbuf = malloc(seq[i].buf_size);
+        if(!seq[i].pbuf) {
+            printf("error: malloc seq[%d] fail\n", i);
+            return -1;
+        }
+    }
+    
+    /*************************************************************************
+     *                          frame loop
+     ************************************************************************/
+    for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
+    {
+    }
+    
+    for (i=0; i<2; ++i) {
+        if (seq[i].pbuf)    free(seq[i].pbuf);
+        if (seq[i].fp)      fclose(seq[i].fp);
+    }
+    
     return 0;
 }
 
