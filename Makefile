@@ -4,7 +4,7 @@ CPPFLAGS = -O3
 INCLUDES = 
 
 LIBS = -lm
-OBJS = yuvdef.o yuvcvt_b8tile.o yuvcvt_b10.o yuvcvt.o yuvcmp.o yuvopt.o yuvmain.o
+OBJS = yuvdef.o yuvcvt_b8tile.o yuvcvt_b10.o yuvcvt.o yuvcmp.o sim_opt.o yuvmain.o
 TARGET = yuv
 
 all : $(OBJS) $(TARGET)
