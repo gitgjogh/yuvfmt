@@ -111,7 +111,7 @@ int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
         return -1;
     }
 
-    return -1;
+    return ++i;
 }
 
 int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
