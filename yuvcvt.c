@@ -40,7 +40,7 @@ const res_t cmn_res[] = {
     {"4k+",     3840,   2176},
 };
 
-const fmt_t cmn_fmt[] = {
+const opt_enum_t cmn_fmt[] = {
     {"400p",    YUVFMT_400P     },
     {"420p",    YUVFMT_420P     },
     {"420sp",   YUVFMT_420SP    },
@@ -54,6 +54,11 @@ const fmt_t cmn_fmt[] = {
 
 const int n_cmn_res = ARRAY_SIZE(cmn_res);
 const int n_cmn_fmt = ARRAY_SIZE(cmn_fmt);
+
+const char* show_fmt(int ifmt)
+{
+    return enum_val_2_name(n_cmn_fmt, cmn_fmt, ifmt);
+}
 
 int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
 {
@@ -104,7 +109,7 @@ int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
     
     for (j=0; j<n_cmn_fmt; ++j) {
         if (0==strcmp(arg, cmn_fmt[j].name)) {
-            *fmt = cmn_fmt[j].ifmt;
+            *fmt = cmn_fmt[j].val;
             return ++i;
         }
     }
@@ -888,7 +893,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         
         for (j=0; j<n_cmn_fmt; ++j) {
             if (0==strcmp(arg, cmn_fmt[j].name)) {
-                seq->yuvfmt = cmn_fmt[j].ifmt;
+                seq->yuvfmt = cmn_fmt[j].val;
                 break;
             }
         }

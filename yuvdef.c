@@ -261,7 +261,8 @@ void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
     
     XTR_I(width     );
     XTR_I(height    );
-    XTR_I(yuvfmt    );
+    XTR_I(yuvfmt    );      
+    xlog(level, "(%s), ", show_fmt(yuv->yuvfmt));
     XTR_I(nlsb      );
     XTR_I(nbit      );
     XTR_I(btile     );

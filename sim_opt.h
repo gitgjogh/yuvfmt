@@ -117,4 +117,60 @@ int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
 int     arg_parse_xlevel(int i, int argc, char *argv[]);
 
+
+enum option_type {
+    OPT_T_BOOL      =   'b',
+    OPT_T_INTI      =   'd',
+    OPT_T_INTX      =   'x',
+    OPT_T_STR       =   'sp',
+    OPT_T_STRCPY    =   'sa',
+};
+
+typedef struct opt_reference {
+    char *name;
+    char *val;
+} opt_ref_t;
+
+typedef struct opt_enum {
+    char *name;
+    int   val;
+} opt_enum_t;
+
+typedef struct option_description {
+    char*   name;
+    int     type;
+    int     narg;
+    void*   pval;
+    char*   default_val;
+    char*   help;
+    
+    short   nref;
+    short   nenum;
+    union {
+        opt_ref_t*  refs;
+        opt_enum_t* enums;
+    };
+    
+//<! private:
+    int     n_parse;
+    int     argvIdx;
+    int     b_default;
+    int     i_ref;
+    int     i_enum;
+} opt_desc_t;
+
+int cmdl_set_ref(int optc, opt_desc_t optv[], 
+                const char *name, int n_ref, opt_ref_t *refs);
+int cmdl_set_enum(int optc, opt_desc_t optv[], 
+                const char *name, int n_enum, opt_enum_t *enums);
+
+int cmdl_getdesc_byref (int optc, opt_desc_t optv[], const char *name);
+int cmdl_getdesc_byname(int optc, opt_desc_t optv[], const char *name);
+int cmdl_init(int optc, opt_desc_t optv[]);
+int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[]);
+int cmdl_parse_opt(int i, int argc, char *argv[], opt_desc_t *opt);
+int cmdl_help(int optc, opt_desc_t optv[]);
+int cmdl_check(int optc, opt_desc_t optv[]);
+int cmdl_result(int optc, opt_desc_t optv[]);
+
 #endif  // __SIM_OPT_H__
