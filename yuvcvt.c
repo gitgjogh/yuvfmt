@@ -78,14 +78,14 @@ int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
     //seq->width = strtoul (arg, &flag, 10);
     flag = get_uint32 (arg, pw);
     if (flag==0 || *flag != 'x') {
-        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        xerr("@cmdl>> not (%%d)x(%%d)\n");
         return -1;
     }
     
     //seq->height = strtoul (flag + 1, &last, 10);
     last = get_uint32 (flag + 1, ph);
     if (last == 0 || *last != 0 ) {
-        printf("@cmdl>> Err : not (%%d)x(%%d)\n");
+        xerr("@cmdl>> not (%%d)x(%%d)\n");
         return -1;
     }
 
@@ -108,7 +108,7 @@ int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
         }
     }
     
-    printf("@cmdl>> Err : unrecognized yuvfmt `%s`\n", arg);
+    xerr("@cmdl>> unrecognized yuvfmt `%s`\n", arg);
     return -1;
 }
 
@@ -544,7 +544,7 @@ int b16_rect_transpose(uint8_t* rect_base, int dstw, int dsth)
     {
         tr_base = (uint16_t*) malloc ( size_needed );
         if (tr_base==0) {
-            printf("%s : malloc fail!\n", __FUNCTION__);
+            xerr("%s : malloc fail!\n", __FUNCTION__);
             return 0;
         }
     }
@@ -859,7 +859,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     {
         char *arg = argv[i];
         if (arg[0]!='-') {
-            printf("@cmdl>> Err : unrecognized arg `%s`\n", arg);
+            xerr("@cmdl>> unrecognized arg `%s`\n", arg);
             return -i;
         }
         arg += 1;
@@ -933,8 +933,19 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "iosize")) {
             i = arg_parse_int(i, argc, argv, &seq->io_size);
         } else
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_NON);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_ALL);
+        } else
+        if (0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
         {
-            printf("@cmdl>> Err : invalid opt `%s`\n", arg);
+            xerr("@cmdl>> invalid opt `%s`\n", arg);
             return -i;
         }
     }
@@ -956,23 +967,23 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
-        printf("@cmdl>> Err : Invalid frame_range %d~%d\n", 
+        xerr("@cmdl>> Invalid frame_range %d~%d\n", 
                 cfg->frame_range[0], cfg->frame_range[1]);
         return -1;
     }
     if (!psrc->width || !psrc->height) {
-        printf("@cmdl>> Err : invalid resolution for src\n");
+        xerr("@cmdl>> Invalid resolution for src\n");
         return -1;
     }
     if ((psrc->nbit != 8 && psrc->nbit!=10 && psrc->nbit!=16) ||
         (psrc->nbit < psrc->nlsb)) {
-        printf("@cmdl>> Err : invalid bitdepth (%d/%d) for src\n", 
+        xerr("@cmdl>> Invalid bitdepth (%d/%d) for src\n", 
                 psrc->nlsb, psrc->nbit);
         return -1;
     }
     if ((pdst->nbit != 8 && pdst->nbit!=10 && pdst->nbit!=16) ||
         (pdst->nbit < pdst->nlsb)) {
-        printf("@cmdl>> Err : invalid bitdepth (%d/%d) for dst\n", 
+        xerr("@cmdl>> Invalid bitdepth (%d/%d) for dst\n", 
                 pdst->nlsb, pdst->nbit);
         return -1;
     }
@@ -1037,7 +1048,7 @@ int yuv_cvt(int argc, char **argv)
         seq[i].buf_size = w_align * h_align * 3 * nbyte;
         seq[i].pbuf = (uint8_t *)malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
-            printf("error: malloc seq[%d] fail\n", i);
+            xerr("error: malloc seq[%d] fail\n", i);
             return -1;
         }
     }
@@ -1047,21 +1058,21 @@ int yuv_cvt(int argc, char **argv)
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        printf("\n@frm> **** %d ****\n", i);
+        xlog(SLOG_L1, "@frm> #%d +\n", i);
         
         set_yuv_prop_by_copy(&seq[0], &cfg.src);
         
         r=fseek(cfg.src.fp, seq[0].io_size * i, SEEK_SET);
         if (r) {
-            printf("fseek %d error\n", seq[0].io_size * i);
+            xerr("fseek %d error\n", cfg.src.io_size * i);
             return -1;
         }
         r = fread(seq[0].pbuf, seq[0].io_size, 1, cfg.src.fp);
         if (r<1) {
             if ( feof(cfg.src.fp) ) {
-                printf("reach file end, force stop\n");
+                xlog(SLOG_INFO, "@seq> reach file end, force stop\n");
             } else {
-                printf("error reading file\n");
+                xerr("error reading file\n");
             }
             break;
         }
@@ -1071,9 +1082,10 @@ int yuv_cvt(int argc, char **argv)
         
         r = fwrite(pdst->pbuf, pdst->io_size, 1, cfg.dst.fp);
         if (r<1) {
-            printf("error writing file\n");
+            xerr("error writing file\n");
             break;
         }
+        xlog(SLOG_L1, "@frm> #%d -\n", i);
     } // end frame loop
     
     for (i=0; i<2; ++i) {

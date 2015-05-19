@@ -180,10 +180,10 @@ int ios_open(ios_t *ios, int nch)
         if (f->b_used) {
             f->fp = fopen(f->path, f->mode);
             if( f->fp ){
-                printf("@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
+                xlog(SLOG_IOS, "@ios>> ch#%d fopen(%s, %s)\n", ch, f->path, f->mode);
                 ++ j;
             } else {
-                printf("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
+                xerr("@ios>> error fopen(%s, %s)\n", f->path, f->mode);
             }
         }
     }
@@ -196,7 +196,7 @@ int ios_close(ios_t *ios, int nch)
     for (ch=j=0; ch<nch; ++ch) {
         ios_t *f = &ios[ch];
         if (f->b_used && f->fp) {
-            printf("@ios>> ch#%d fclose(%s)\n", ch, f->path);
+            xlog(SLOG_IOS, "@ios>> ch#%d fclose(%s)\n", ch, f->path);
             fclose(f->fp);
             f->fp = 0;
             ++ j;
@@ -205,12 +205,12 @@ int ios_close(ios_t *ios, int nch)
     return j;  
 }
 
-char *get_argv(int argc, char *argv[], int i, char *name)
+char *get_argv(int argc, char *argv[], int i, const char *name)
 {
-    int s = i<argc ? argv[i][0] : 0;
+    int s = (argv && i<argc) ? argv[i][0] : 0;
     char *arg = (s != 0 && s != '-') ? argv[i] : 0;
     if (name) {
-        printf("@cmdl>> get_argv[%s]=%s\n", name, arg?arg:"");
+        xlog(SLOG_CMDL, "@cmdl>> -%s[%d] = `%s'\n", SAFE_STR(name,""), i, SAFE_STR(arg,""));
     }
     return arg;
 }
@@ -251,14 +251,14 @@ int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
 
     /* get `~$last` or `+$count` */
     if (*flag != '~' && *flag != '+') {
-        printf("@cmdl>> Err : Invalid flag\n");
+        xerr("@cmdl>> Err : Invalid flag\n");
         return -1;
     }
     
     //i_range[1] = strtoul (flag + 1, &last, 10);
     last = get_uint32 (flag + 1, &i_range[1]);
     if (last == 0 || *last != 0 ) {
-        printf("@cmdl>> Err : Invalid count/end\n");
+        xerr("@cmdl>> Err : Invalid count/end\n");
         i_range[1] = INT_MAX;
         return -1;
     }
@@ -291,3 +291,28 @@ int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
     return arg ? ++i : i;
 }
 
+int arg_parse_xlevel(int i, int argc, char *argv[])
+{
+    int j = i;
+    while (i>=j && i<argc)
+    {
+        char *arg = &argv[i][1];
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_NON);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_ALL);
+        } else
+        if (0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
+        {
+            break;
+        }
+        j = i;
+    }
+    
+    return i;
+}

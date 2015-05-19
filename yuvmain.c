@@ -22,34 +22,41 @@
 
 int main(int argc, char **argv)
 {
-    int j = 0;
+    int i=0, j = 0;
     int exit_code = 0;
     
     typedef struct yuv_module {
         const char *name; 
         int (*func)(int argc, char **argv);
-        int (*help)();
+        const char *help;
     } yuv_module_t;
     
     const static yuv_module_t sub_main[] = {
-        {"cvt",     yuv_cvt,    cvt_arg_help},
-        {"cmp",     yuv_cmp,    cmp_arg_help},
+        {"cvt",     yuv_cvt,    "yuv fmt convertor"},
+        {"cmp",     yuv_cmp,    "yuv diff/psnr"},
     };
+
+    xlog_init(SLOG_DBG-1);
+    i = arg_parse_xlevel(1, argc, argv);
     
-    if (argc<2) {
+    xdbg("@cmdl>> argv[%d] = %s\n", i, i<argc ? argv[i] : "?");
+
+    if (i>=argc) {
         printf("No module specified. ");
     } else {
         for (j=0; j<ARRAY_SIZE(sub_main); ++j) {
-            if (0==strcmp(argv[1], sub_main[j].name)) {
-                return sub_main[j].func(argc-1, argv+1);
+            if (0==strcmp(argv[i], sub_main[j].name)) {
+                return sub_main[j].func(argc-i, argv+i);
             }
         }
-        printf("`%s` is not support. ", argv[1]);
+        if (strcmp(argv[i], "-h") && strcmp(argv[i], "--help")) {
+            printf("`%s` is not support. ", argv[i]);
+    }
     }
     
     printf("Use the following modules:\n");
     for (j=0; j<ARRAY_SIZE(sub_main); ++j) {
-        printf("\t%s\n", sub_main[j].name);
+        printf("\t%4s - %s\n", sub_main[j].name, sub_main[j].help);
     }
     return exit_code;
     

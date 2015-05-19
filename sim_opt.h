@@ -79,12 +79,9 @@ int xerr (const char *fmt, ...);
 int xdbgv(const char *fmt, va_list ap);
 int xdbg (const char *fmt, ...);
 
-#ifndef ENTER_FUNC
 static int fcall_layer = 0;
 #define ENTER_FUNC()  xlog(SLOG_FUNC, "@>>>> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
 #define LEAVE_FUNC()  xlog(SLOG_FUNC, "@<<<< %-2d: %s(-)\n\n", --fcall_layer, __FUNCTION__)
-#endif
-
 #define EMPTYSTR                ("")
 #define SAFE_STR(s, nnstr)      ((s)?(s):(nnstr))
 
@@ -107,12 +104,13 @@ int     ios_close(ios_t *p, int nch);
 
 
 #define GET_ARGV(idx, name) get_argv(argc, argv, idx, name);
-char*   get_argv(int argc, char *argv[], int i, char *name);
+char*   get_argv(int argc, char *argv[], int i, const char *name);
 char*   get_uint32 (char *str, uint32_t *out);
 
 int     arg_parse_range(int i, int argc, char *argv[], int i_range[2]);
 int     arg_parse_str(int i, int argc, char *argv[], char **p);
 int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
+int     arg_parse_xlevel(int i, int argc, char *argv[]);
 
 #endif  // __SIM_OPT_H__

@@ -279,8 +279,19 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "blksz")) {
             i = arg_parse_range(i, argc, argv, &cfg->blksz);
         } else
+        if (0==strcmp(arg, "xnon")) {
+            ++i;    xlevel(SLOG_NON);
+        } else
+        if (0==strcmp(arg, "xall")) {
+            ++i;    xlevel(SLOG_ALL);
+        } else
+        if (0==strcmp(arg, "x") || 0==strcmp(arg, "xlevel")) {
+            int level;
+            i = arg_parse_int(i, argc, argv, &level);
+            xlevel(level);
+        } else
         {
-            printf("@cmdl>> Err : invalid opt `%s`\n", arg);
+            xerr("@cmdl>> invalid opt `%s`\n", arg);
             return -i;
         }
     }
@@ -301,13 +312,13 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     {
         yuv_seq_t* psrc = &cfg->seq[i];
         if (!psrc->path) {
-            printf("@cmdl>> Err : no input %d\n", i);
+            xerr("@cmdl>> no input %d\n", i);
             return -1;
         }
         
         if ((psrc->nbit!= 8 && psrc->nbit!=10 && psrc->nbit!=16) || 
             (psrc->nbit < psrc->nlsb)) {
-            printf("@cmdl>> Err : invalid bitdepth (%d/%d) for input %d\n", 
+            xerr("@cmdl>> invalid bitdepth (%d/%d) for input %d\n", 
                     psrc->nlsb, psrc->nbit, i);
             return -1;
         }
@@ -315,7 +326,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     }
     
     if (!yuv->width || !yuv->height) {
-        printf("@cmdl>> Err : invalid resolution(%dx%d)\n",
+        xerr("@cmdl>> invalid resolution(%dx%d)\n",
                 yuv->width, yuv->height);
         return -1;
     }
@@ -323,7 +334,7 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
         
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
-        printf("@cmdl>> Err : Invalid frame_range %d~%d\n", 
+        xerr("@cmdl>> Invalid frame_range %d~%d\n", 
                 cfg->frame_range[0], cfg->frame_range[1]);
         return -1;
     }
@@ -408,22 +419,22 @@ int yuv_cmp(int argc, char **argv)
      ************************************************************************/
     for (j=cfg.frame_range[0]; j<cfg.frame_range[1]; j++) 
     {
-        printf("\n@frm> **** %d ****\n", j);
+        xlog(SLOG_DBG, "@frm> **** %d ****\n", j);
 
         for (i=0; i<2; ++i) 
         {
             set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
             r=fseek(cfg.seq[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
-                printf("%d: fseek %d error\n", i, seq[i].io_size * j);
+                xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
                 return -1;
             }
             r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.seq[i].fp);
             if (r<1) {
                 if ( feof(cfg.seq[i].fp) ) {
-                    printf("@seq>> $%d: reach file end, force stop\n", i);
+                    xlog(SLOG_L1, "@seq>> $%d: reach file end, force stop\n", i);
                 } else {
-                    printf("@seq>> $%d: error reading file\n", i);
+                    xerr("@seq>> $%d: error reading file\n", i);
                 }
                 break;
             }
@@ -448,19 +459,19 @@ int yuv_cmp(int argc, char **argv)
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
-        printf("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
+        xlog(SLOG_L1, "@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.seq[2].fp) {
             r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.seq[2].fp);
             if (r<1) {
-                printf("error writing file\n");
+                xerr("error writing file\n");
                 break;
             }
         }
     }
     
     psnr = get_stat_psnr(&stat[1]);
-    printf("@seq>> PSNR = %.2llf\n", psnr);
+    xlog(SLOG_L0, "@seq>> PSNR = %.2llf\n", psnr);
     
     for (i=0; i<3; ++i) {
         if (cfg.seq[i].fp)  fclose(cfg.seq[i].fp);
