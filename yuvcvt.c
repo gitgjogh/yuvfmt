@@ -596,6 +596,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         yuv_seq_t *ptmp=psrc; psrc=pdst; pdst=ptmp; \
     } while(0)
     
+    SWAP_SRC_DST();
     /**
      *  b10-untile/unpack, b8-untile
      */
