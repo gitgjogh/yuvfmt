@@ -88,6 +88,32 @@ void swap_uv(uint8_t **u, uint8_t **v)
     *v = m;
 }
 
+int get_uv_width(yuv_seq_t *yuv)
+{
+    int fmt = yuv->yuvfmt;
+    
+    if       (is_semi_planar(fmt)) {
+        return yuv->width;
+    } else if (is_mch_planar(fmt)) {
+        return yuv->width / 2;
+    }
+    
+    return 0;
+}
+
+int get_uv_height(yuv_seq_t *yuv)
+{
+    int fmt = yuv->yuvfmt;
+
+    if       (is_mch_422(fmt)) {
+        return yuv->height;
+    } else if (is_mch_420(fmt)) {
+        return yuv->height / 2;
+    }
+
+    return 0;
+}
+
 void b8_linear_2_rect_align_0(uint8_t* line, uint8_t* rect, int w, int h, int s)
 {
     int i, j;
