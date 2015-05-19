@@ -170,7 +170,8 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     if (0 != strcmp(argv[1], "-i0") && 0 != strcmp(argv[1], "-i1") &&
-        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") )
+        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") &&
+        0 != strcmp(argv[1], "-x")  && 0 != strcmp(argv[1], "-xall"))
     {
         return -1;
     }
@@ -210,7 +211,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cmp_arg_help();
-            return -1;
+            return 0;
         } else
         if (0==strcmp(arg, "i0")) {
             char *path;
@@ -351,16 +352,23 @@ int cmp_arg_close(cmp_opt_t *cfg)
 
 int cmp_arg_help()
 {
+    printf("yuv sequences comparation. Options\n");
+    printf("-wxh <%%dx%%d>\n");
     printf("-i0 name<%%s> {...yuv props...} \n");
     printf("-i1 name<%%s> {...yuv props...} \n");
     printf("-o  name<%%s> {...yuv props...} \n");
     printf("\n...yuv props...\n");
-    printf("\t [-wxh <%%dx%%d>]\n");
     printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
     printf("\t [-stride <%%d>]\n");
     printf("\t [-fsize <%%d>]\n");
     printf("\t [-b10]\n");
     printf("\t [-btile]\n");
+    
+    int j;
+    printf("\n-wxh option can be short as follow:\n");
+    for (j=0; j<n_cmn_res; ++j) {
+        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+    }
     return 0;
 }
 
@@ -379,7 +387,11 @@ int yuv_cmp(int argc, char **argv)
     cmp_arg_init (&cfg, argc, argv);
     
     r = cmp_arg_parse(&cfg, argc, argv);
-    if (r < 0) {
+    if (r == 0) {
+        //help exit
+        return 0;
+    } else if (r < 0) {
+        xerr("cmp_arg_parse() failed\n");
         cmp_arg_help();
         return 1;
     }

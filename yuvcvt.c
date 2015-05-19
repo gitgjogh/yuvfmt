@@ -848,6 +848,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
 {
     int i, j;
     yuv_seq_t *seq = &cfg->dst;
+    yuv_seq_t *src = &cfg->src;
+    yuv_seq_t *dst = &cfg->dst;
     
     ENTER_FUNC();
     
@@ -855,7 +857,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         return -1;
     }
     if (0 != strcmp(argv[1], "-dst") && 0 != strcmp(argv[1], "-src") &&
-        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") )
+        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") &&
+        0 != strcmp(argv[1], "-x")   && 0 != strcmp(argv[1], "-xall"))
     {
         return -1;
     }
@@ -874,8 +877,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         
         for (j=0; j<n_cmn_res; ++j) {
             if (0==strcmp(arg, cmn_res[j].name)) {
-                seq->width  = cmn_res[j].w;
-                seq->height = cmn_res[j].h;
+                src->width  = cmn_res[j].w;
+                src->height = cmn_res[j].h;
                 break;
             }
         }
@@ -895,7 +898,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cvt_arg_help();
-            return -1;
+            return 0;
         } else
         if (0==strcmp(arg, "src")) {
             char *path = 0;
@@ -910,7 +913,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             ios_cfg(cfg->ios, CVT_IOS_DST, path, "wb");
         } else
         if (0==strcmp(arg, "wxh")) {
-            i = arg_parse_wxh(i, argc, argv, &seq->width, &seq->height);
+            i = arg_parse_wxh(i, argc, argv, &src->width, &src->height);
         } else
         if (0==strcmp(arg, "fmt")) {
             i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
@@ -928,7 +931,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             i = opt_parse_int(i, argc, argv, &seq->btile, 1);
             seq->btile ? (seq->yuvfmt = YUVFMT_420SP) : 0;
         } else  
-        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "nframe") ||0==strcmp(arg, "n")) {
             int nframe = 0;
             i = arg_parse_int(i, argc, argv, &nframe);
             cfg->frame_range[1] = nframe + cfg->frame_range[0];
@@ -1028,16 +1031,33 @@ int cvt_arg_close(cvt_opt_t *cfg)
 
 int cvt_arg_help()
 {
-    printf("-dst name<%%s> {...yuv props...} \n");
-    printf("-src name<%%s> {...yuv props...} \n");
-    printf("[-frame <%%d>]\n");
-    printf("\n...yuv props...\n");
+    printf("yuv format convertor. Options:\n");
+    printf("\t -dst name<%%s> {...props...}\n");
+    printf("\t -src name<%%s> {...props...}\n");
+    printf("\t -f   <%%d~%%d>\n");
+    
+    printf("\nset yuv props as follow:\n");
     printf("\t [-wxh <%%dx%%d>]\n");
     printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
     printf("\t [-stride <%%d>]\n");
-    printf("\t [-fsize <%%d>]\n");
+    printf("\t [-iosize <%%d>]  //frame buf size\n");
     printf("\t [-b10]\n");
-    printf("\t [-btile]\n");
+    printf("\t [-btile|-tile|-t]\n");
+    
+    printf("\nset frame range as follow:\n");
+    printf("\t [-f-range|-f <%%d~%%d>]\n");
+    printf("\t [-f-start    <%%d>]\n");
+    printf("\t [-n-frame|-n <%%d>]\n");
+    
+    int j;
+    printf("\n-wxh option can be short as follow:\n");
+    for (j=0; j<n_cmn_res; ++j) {
+        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+    }
+    //printf("\nfmt can be short as follow:\n");
+    //for (j=0; j<n_cmn_fmt; ++j) {
+    //    printf("\t -%-7s : %2d\n", cmn_fmt[j].name, cmn_fmt[j].val);
+    //}
     return 0;
 }
 
@@ -1052,7 +1072,11 @@ int yuv_cvt(int argc, char **argv)
     cvt_arg_init (&cfg, argc, argv);
     
     r = cvt_arg_parse(&cfg, argc, argv);
-    if (r < 0) {
+    if (r == 0) {
+        //help exit
+        return 0;
+    } else if (r < 0) {
+        xerr("cvt_arg_parse() failed\n");
         cvt_arg_help();
         return 1;
     }
