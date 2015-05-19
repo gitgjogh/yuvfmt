@@ -15,7 +15,9 @@
 *****************************************************************************/
 
 #include <assert.h>
+#include <malloc.h>
 #include <stdio.h>
+
 #include "yuvdef.h"
 
 
@@ -127,7 +129,7 @@ int get_uv_height(yuv_seq_t *yuv)
 }
 
 
-void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt, 
+void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt, 
                     int nbit, int nlsb, int btile, 
                     int stride, int io_size)
 {
@@ -200,20 +202,49 @@ void set_yuv_prop(yuv_seq_t *yuv, int w, int h, int fmt,
     }
     
     yuv->io_size = max(io_size, yuv->io_size);
-    assert(!yuv->pbuf || yuv->buf_size >= yuv->io_size);
-    
-    void show_yuv_prop(yuv_seq_t *yuv);
-    //show_yuv_prop(yuv);
+    if (b_realloc) {
+        yuv_buf_realloc(yuv, yuv->io_size);
+    }
 
     return;
 }
 
-void set_yuv_prop_by_copy(yuv_seq_t *dst, yuv_seq_t *src)
+void set_yuv_prop_by_copy(yuv_seq_t *dst, int b_realloc, yuv_seq_t *src)
 {
-    return set_yuv_prop(dst, 
+    return set_yuv_prop(dst, b_realloc,
             src->width, src->height, src->yuvfmt, 
             src->nbit,  src->nlsb,   src->btile, 
             src->y_stride, src->io_size);
+}
+
+int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
+{
+    if (!yuv) {
+        xerr("null yuv");
+        return 0;
+    }
+    if (yuv->pbuf != 0 && yuv->buf_size >= buf_size) {
+        return 0;
+    }
+    void *new_buf = realloc (yuv->pbuf, buf_size);
+    if (new_buf) {
+        yuv->pbuf = new_buf;
+        yuv->buf_size = buf_size;
+        xlog(SLOG_MEM, "@buf>> yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
+    } else {
+        xerr("@buf>> yuv_buf_malloc(%d) failed\n", buf_size);
+    }
+    return yuv->buf_size;   
+}
+
+void yuv_buf_free(yuv_seq_t *yuv)
+{
+    if (yuv && yuv->pbuf) {
+        xlog(SLOG_MEM, "@buf>> yuv_buf_free() = 0x%08x\n", yuv->pbuf);
+        free(yuv->pbuf);
+        yuv->pbuf = 0;
+        yuv->buf_size = 0;
+    }   
 }
 
 void show_yuv_prop(yuv_seq_t *yuv)

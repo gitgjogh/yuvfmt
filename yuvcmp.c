@@ -58,7 +58,6 @@ dstat_t b8_rect_diff(int w, int h, uint8_t *base[3],
         stat->sad += st.sad;
         stat->ssd += st.ssd;
     }
-    
     return st;
 }
 
@@ -167,7 +166,10 @@ dstat_t yuv_diff(yuv_seq_t *seq1, yuv_seq_t *seq2,
 
 int cmp_arg_init (cmp_opt_t *cfg, int argc, char *argv[])
 {
-    return 0;
+    set_yuv_prop(&cfg->seq[0], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->seq[1], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    set_yuv_prop(&cfg->seq[2], 0, 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
+    cfg->frame_range[1] = INT_MAX;
 }
 
 int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
@@ -186,13 +188,6 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     {
         return -1;
     }
-    
-    /**
-     *  init options
-     */
-    set_yuv_prop(&cfg->seq[0], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    set_yuv_prop(&cfg->seq[1], 0, 0, YUVFMT_420P, BIT_8, BIT_8, TILE_0, 0, 0);
-    cfg->frame_range[1] = INT_MAX;
 
     /**
      *  loop options
@@ -338,8 +333,6 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
                 yuv->width, yuv->height);
         return -1;
     }
-    cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
-    cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
         
     if (cfg->frame_range[0] >= cfg->frame_range[1]) {
         xerr("@cmdl>> Invalid frame_range %d~%d\n", 
@@ -350,6 +343,14 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     if (!ios_open(cfg->ios, CMP_IOS_CNT, 0)) {
         ios_close(cfg->ios, CMP_IOS_CNT);
         return -1;
+    }
+    
+    cfg->seq[2].width  = cfg->seq[1].width  = cfg->seq[0].width;
+    cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
+    for (i=0; i<3; ++i) {
+        set_yuv_prop_by_copy(&cfg->seq[i], 0, &cfg->seq[i]);
+        xlog(SLOG_CFG, "@cfg> yuv#%d: ", i);  
+        show_yuv_prop(&cfg->seq[i]);
     }
     
     LEAVE_FUNC();
@@ -398,32 +399,16 @@ int yuv_cmp(int argc, char **argv)
     }
     r = cmp_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        printf("\n****src1****\n");  show_yuv_prop(&cfg.seq[0]);
-        printf("\n****src2****\n");  show_yuv_prop(&cfg.seq[1]);
-        printf("\n****diff****\n");  show_yuv_prop(&cfg.seq[2]);
+        xerr("cmp_arg_check() failed\n");
         return 1;
     }
 
-    int w_align = bit_sat(6, cfg.seq[0].width);
-    int h_align = bit_sat(6, cfg.seq[0].height);
-    int nbyte   = 1 + (cfg.seq[0].nbit > 8 || cfg.seq[1].nbit > 8);
-    char* fm[3] = {"rb", "rb", "wb"};
-    
-    for (i=0; i<3; ++i) 
-    {
-        seq[i].buf_size = w_align * h_align * 3 * nbyte;
-        seq[i].pbuf = malloc(seq[i].buf_size);
-        if(!seq[i].pbuf) {
-            printf("error: malloc seq[%d] fail\n", i);
-            return -1;
-        }
-    }
-    
-    set_yuv_prop(&seq[3], cfg.seq[0].width, cfg.seq[0].height, 
+    set_yuv_prop(&seq[3], 0, cfg.seq[0].width, cfg.seq[0].height, 
             get_spl_fmt(cfg.seq[0].yuvfmt), 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             cfg.seq[0].nbit>8 ? BIT_16 : BIT_8, 
             TILE_0, 0, 0);
+    show_yuv_prop(&seq[3]);
 
     /*************************************************************************
      *                          frame loop
@@ -434,7 +419,7 @@ int yuv_cmp(int argc, char **argv)
 
         for (i=0; i<2; ++i) 
         {
-            set_yuv_prop_by_copy(&seq[i], &cfg.seq[i]);
+            set_yuv_prop_by_copy(&seq[i], 1, &cfg.seq[i]);
             r = fseek(cfg.ios[i].fp, seq[i].io_size * j, SEEK_SET);
             if (r) {
                 xerr("%d: fseek %d error\n", i, seq[i].io_size * j);
@@ -453,7 +438,7 @@ int yuv_cmp(int argc, char **argv)
             // get one buffer unused
             ptmp = (i==0) ? &seq[2] : 
                             (spl[0] == &seq[0] ? &seq[2] : &seq[0]);
-            set_yuv_prop_by_copy(ptmp, &seq[3]);
+            set_yuv_prop_by_copy(ptmp, 1, &seq[3]);
             spl[i] = yuv_cvt_frame(ptmp, &seq[i]);
         }
         if ( ios_feof(cfg.ios, 0) || ios_feof(cfg.ios, 1) ) {
@@ -466,7 +451,7 @@ int yuv_cmp(int argc, char **argv)
                 break;
             }
         }
-        set_yuv_prop_by_copy(ptmp, &seq[3]);
+        set_yuv_prop_by_copy(ptmp, 1, &seq[3]);
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
@@ -486,7 +471,7 @@ int yuv_cmp(int argc, char **argv)
     
     cmp_arg_close(&cfg);
     for (i=0; i<3; ++i) {
-        if (seq[i].pbuf)    free(seq[i].pbuf);
+        yuv_buf_free(&seq[i]);
     }
     
     return !!stat[1].ssd;
