@@ -458,7 +458,9 @@ int yuv_cmp(int argc, char **argv)
         xlog(SLOG_L1, "@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.ios[2].fp) {
-            r = fwrite(ptmp->pbuf, ptmp->io_size, 1, cfg.ios[2].fp);
+            set_yuv_prop_by_copy(spl[0], 1, &cfg.seq[2]);
+            yuv_seq_t* diff = yuv_cvt_frame(spl[0], ptmp);
+            r = fwrite(diff->pbuf, diff->io_size, 1, cfg.ios[2].fp);
             if (r<1) {
                 xerr("error writing file\n");
                 break;
