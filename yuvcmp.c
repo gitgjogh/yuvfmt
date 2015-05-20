@@ -186,29 +186,38 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             xerr("@cmdl>> unrecognized arg `%s`\n", arg);
             return -i;
         }
+        
+        /** search for enum or ref first
+         */
+        if (arg[1] == '%') 
+        {
+            for (j=0; j<n_cmn_res; ++j) {
+                if (0==strcmp(&arg[2], cmn_res[j].name)) {
+                    yuv->width  = cmn_res[j].w;
+                    yuv->height = cmn_res[j].h;
+                    break;
+                }
+            }
+            if (j<n_cmn_res) {
+                ++i; continue;
+            }
+            
+            for (j=0; j<n_cmn_fmt; ++j) {
+                if (0==strcmp(&arg[2], cmn_fmt[j].name)) {
+                    seq->yuvfmt = cmn_fmt[j].val;
+                    break;
+                }
+            }
+            if (j<n_cmn_fmt) {
+                ++i; continue;
+            }
+
+            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            return -i;
+        }
+        
         arg += 1;
-        
-        for (j=0; j<n_cmn_res; ++j) {
-            if (0==strcmp(arg, cmn_res[j].name)) {
-                yuv->width  = cmn_res[j].w;
-                yuv->height = cmn_res[j].h;
-                break;
-            }
-        }
-        if (j<n_cmn_res) {
-            ++i; continue;
-        }
-        
-        for (j=0; j<n_cmn_fmt; ++j) {
-            if (0==strcmp(arg, cmn_fmt[j].name)) {
-                seq->yuvfmt = cmn_fmt[j].val;
-                break;
-            }
-        }
-        if (j<n_cmn_fmt) {
-            ++i; continue;
-        }
-        
+
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cmp_arg_help();
             return 0;
@@ -358,7 +367,8 @@ int cmp_arg_help()
     printf("-i1 name<%%s> {...yuv props...} \n");
     printf("-o  name<%%s> {...yuv props...} \n");
     printf("\n...yuv props...\n");
-    printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
+    printf("\t [-fmt <%%420p,%%420sp,%%uyvy,%%422p>]\n");
+    printf("\t [-wxh <%%d>x<%%d>]\n");
     printf("\t [-stride <%%d>]\n");
     printf("\t [-fsize <%%d>]\n");
     printf("\t [-b10]\n");
@@ -367,8 +377,10 @@ int cmp_arg_help()
     int j;
     printf("\n-wxh option can be short as follow:\n");
     for (j=0; j<n_cmn_res; ++j) {
-        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+        printf("\t -%%%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
     }
+    printf("\n-fmt option can be short as follow:\n");
+    printf("\t -%%420p = \"-fmt %%420p\"\n");
     return 0;
 }
 

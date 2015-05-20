@@ -72,12 +72,18 @@ int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
     if (!arg) {
         return -1;
     }
-    
-    for (j=0; j<n_cmn_res; ++j) {
-        if (0==strcmp(arg, cmn_res[j].name)) {
-            *pw = cmn_res[j].w;  
-            *ph = cmn_res[j].h;
-            return ++i;
+   
+    if (arg[0] == '%') { 
+        for (j=0; j<n_cmn_res; ++j) {
+            if (0==strcmp(&arg[1], cmn_res[j].name)) {
+                *pw = cmn_res[j].w;  
+                *ph = cmn_res[j].h;
+                return ++i;
+            }
+        }
+        if (j>=n_cmn_res) {
+            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            return -1;
         }
     }
     
@@ -107,10 +113,16 @@ int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
         return -1;
     }
     
-    for (j=0; j<n_cmn_fmt; ++j) {
-        if (0==strcmp(arg, cmn_fmt[j].name)) {
-            *fmt = cmn_fmt[j].val;
-            return ++i;
+    if (arg[0] == '%') { 
+        for (j=0; j<n_cmn_fmt; ++j) {
+            if (0==strcmp(arg, cmn_fmt[j].name)) {
+                *fmt = cmn_fmt[j].val;
+                return ++i;
+            }
+        }
+        if (j>=n_cmn_fmt) {
+            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            return -1;
         }
     }
     
@@ -878,29 +890,38 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             xerr("@cmdl>> unrecognized arg `%s`\n", arg);
             return -i;
         }
+        
+        /** search for enum or ref first
+         */
+        if (arg[1] == '%') 
+        {
+            for (j=0; j<n_cmn_res; ++j) {
+                if (0==strcmp(&arg[2], cmn_res[j].name)) {
+                    src->width  = cmn_res[j].w;
+                    src->height = cmn_res[j].h;
+                    break;
+                }
+            }
+            if (j<n_cmn_res) {
+                ++i; continue;
+            }
+            
+            for (j=0; j<n_cmn_fmt; ++j) {
+                if (0==strcmp(&arg[2], cmn_fmt[j].name)) {
+                    seq->yuvfmt = cmn_fmt[j].val;
+                    break;
+                }
+            }
+            if (j<n_cmn_fmt) {
+                ++i; continue;
+            }
+
+            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            return -i;
+        }
+        
         arg += 1;
-        
-        for (j=0; j<n_cmn_res; ++j) {
-            if (0==strcmp(arg, cmn_res[j].name)) {
-                src->width  = cmn_res[j].w;
-                src->height = cmn_res[j].h;
-                break;
-            }
-        }
-        if (j<n_cmn_res) {
-            ++i; continue;
-        }
-        
-        for (j=0; j<n_cmn_fmt; ++j) {
-            if (0==strcmp(arg, cmn_fmt[j].name)) {
-                seq->yuvfmt = cmn_fmt[j].val;
-                break;
-            }
-        }
-        if (j<n_cmn_fmt) {
-            ++i; continue;
-        }
-        
+
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cvt_arg_help();
             return 0;
@@ -1043,7 +1064,7 @@ int cvt_arg_help()
     
     printf("\nset yuv props as follow:\n");
     printf("\t [-wxh <%%dx%%d>]\n");
-    printf("\t [-fmt <420p,420sp,uyvy,422p>]\n");
+    printf("\t [-fmt <%%420p,%%420sp,%%uyvy,%%422p>]\n");
     printf("\t [-stride <%%d>]\n");
     printf("\t [-iosize <%%d>]  //frame buf size\n");
     printf("\t [-b10]\n");
@@ -1057,8 +1078,10 @@ int cvt_arg_help()
     int j;
     printf("\n-wxh option can be short as follow:\n");
     for (j=0; j<n_cmn_res; ++j) {
-        printf("\t -%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
+        printf("\t -%%%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
     }
+    printf("\n-fmt option can be short as follow:\n");
+    printf("\t -%%420p = \"-fmt %%420p\"\n");
     //printf("\nfmt can be short as follow:\n");
     //for (j=0; j<n_cmn_fmt; ++j) {
     //    printf("\t -%-7s : %2d\n", cmn_fmt[j].name, cmn_fmt[j].val);

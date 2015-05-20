@@ -725,7 +725,7 @@ int cmdl_parse(int i, int argc, char *argv[], int optc, opt_desc_t optv[])
     ENTER_FUNC();
     
     if (i>=argc) {
-        return -i;
+        return i;
     }
      
     while (i>=0 && i<argc)
@@ -797,11 +797,11 @@ int cmdl_help(int optc, opt_desc_t optv[])
 
         for (j=0; j<opt->nref; ++j ) {
             const opt_ref_t *r = &opt->refs[j];
-            printf("\t &%-10s \t `%s'\n", r->name, r->val);
+            printf("\t %%%-10s \t `%s'\n", r->name, r->val);
         }
         for (j=0; j<opt->nenum; ++j ) {
             const opt_enum_t *e = &opt->enums[j];
-            printf("\t &%-10s \t %d\n", e->name, e->val);
+            printf("\t %%%-10s \t %d\n", e->name, e->val);
         }
     }
     
