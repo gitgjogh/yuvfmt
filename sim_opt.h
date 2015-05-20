@@ -17,6 +17,7 @@
 #ifndef __SIM_OPT_H__
 #define __SIM_OPT_H__
 
+#include <stdint.h>
 #include <stdarg.h>
 
 #ifndef max
@@ -136,6 +137,13 @@ typedef struct opt_enum {
     int   val;
 } opt_enum_t;
 
+int ref_name_2_idx(int nref, const opt_ref_t *refs, const char *name);
+int ref_sval_2_idx(int nref, const opt_ref_t *refs, const char* val);
+int ref_ival_2_idx(int nref, const opt_ref_t *refs, int val);
+int enum_val_2_idx(int nenum, const opt_enum_t* enums, int val);
+int enum_name_2_idx(int nenum, const opt_enum_t* enums, const char *name);
+const char *enum_val_2_name(int nenum, const opt_enum_t* enums, int val);
+
 typedef struct option_description {
     char*   name;
     int     type;
@@ -147,8 +155,8 @@ typedef struct option_description {
     short   nref;
     short   nenum;
     union {
-        opt_ref_t*  refs;
-        opt_enum_t* enums;
+        const opt_ref_t* refs;
+        const opt_enum_t* enums;
     };
     
 //<! private:
@@ -160,9 +168,9 @@ typedef struct option_description {
 } opt_desc_t;
 
 int cmdl_set_ref(int optc, opt_desc_t optv[], 
-                const char *name, int n_ref, opt_ref_t *refs);
+                const char *name, int n_ref, const opt_ref_t *refs);
 int cmdl_set_enum(int optc, opt_desc_t optv[], 
-                const char *name, int n_enum, opt_enum_t *enums);
+                const char *name, int n_enum, const opt_enum_t *enums);
 
 int cmdl_getdesc_byref (int optc, opt_desc_t optv[], const char *name);
 int cmdl_getdesc_byname(int optc, opt_desc_t optv[], const char *name);

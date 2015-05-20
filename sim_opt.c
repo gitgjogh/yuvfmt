@@ -201,8 +201,8 @@ int ios_open(ios_t ios[], int nch, int *nop)
                     char yes_or_no = 0;
                     fclose(fp); fp =0;
                     printf("file `%s' already exist, overwrite? (y/n) : ", f->path);
-                    scanf("%c", &yes_or_no);
-                    if (yes_or_no != 'y') {
+                    int r = scanf("%c", &yes_or_no);
+                    if (r!=1 || yes_or_no != 'y') {
                         printf("file `%s' would be skipped\n", f->path);
                         continue;
                     }
@@ -453,7 +453,7 @@ int cmdl_val2str(opt_desc_t *opt, int i_arg)
     return r;
 }
 
-int ref_name_2_idx(int nref, opt_ref_t *refs, const char *name)
+int ref_name_2_idx(int nref, const opt_ref_t *refs, const char *name)
 {
     int i;
     for(i=0; i<nref; ++i) {
@@ -464,7 +464,7 @@ int ref_name_2_idx(int nref, opt_ref_t *refs, const char *name)
     return -1;
 }
 
-int ref_sval_2_idx(int nref, opt_ref_t *refs, const char* val)
+int ref_sval_2_idx(int nref, const opt_ref_t *refs, const char* val)
 {
     int i;
     for(i=0; i<nref; ++i) {
@@ -475,15 +475,15 @@ int ref_sval_2_idx(int nref, opt_ref_t *refs, const char* val)
     return -1;
 }
 
-int ref_ival_2_idx(int nref, opt_ref_t *refs, int val)
+int ref_ival_2_idx(int nref, const opt_ref_t *refs, int val)
 {
     int i;
     char s[256] = {0};
-    snprintf(s, 256, "%s", val);
+    snprintf(s, 256, "%d", val);
     return ref_sval_2_idx(nref, refs, s);
 }
 
-int enum_val_2_idx(int nenum, opt_enum_t* enums, int val)
+int enum_val_2_idx(int nenum, const opt_enum_t* enums, int val)
 {
     int i;
     for(i=0; i<nenum; ++i) {
@@ -494,7 +494,7 @@ int enum_val_2_idx(int nenum, opt_enum_t* enums, int val)
     return 0;
 }
 
-const char *enum_val_2_name(int nenum, opt_enum_t* enums, int val)
+const char *enum_val_2_name(int nenum, const opt_enum_t* enums, int val)
 {
     int i = enum_val_2_idx(nenum, enums, val);
     if (i >= 0) {
@@ -503,7 +503,7 @@ const char *enum_val_2_name(int nenum, opt_enum_t* enums, int val)
     return 0;
 }
 
-int enum_name_2_idx(int nenum, opt_enum_t* enums, const char *name)
+int enum_name_2_idx(int nenum, const opt_enum_t* enums, const char *name)
 {
     int i;
     for(i=0; i<nenum; ++i) {
@@ -598,7 +598,7 @@ int cmdl_getdesc_byname(int optc, opt_desc_t optv[], const char *name)
 }
 
 int cmdl_set_ref(int optc, opt_desc_t optv[], 
-                const char *name, int nref, opt_ref_t *refs)
+                const char *name, int nref, const opt_ref_t *refs)
 {
     int i_opt = cmdl_getdesc_byname(optc, optv, name);
     if (i_opt >= 0) {
@@ -610,7 +610,7 @@ int cmdl_set_ref(int optc, opt_desc_t optv[],
 }
 
 int cmdl_set_enum(int optc, opt_desc_t optv[], 
-                const char *name, int nenum, opt_enum_t *enums)
+                const char *name, int nenum, const opt_enum_t *enums)
 {
     int i_opt = cmdl_getdesc_byname(optc, optv, name);
     if (i_opt >= 0) {
@@ -796,11 +796,11 @@ int cmdl_help(int optc, opt_desc_t optv[])
                 opt->default_val ? opt->default_val : "" );
 
         for (j=0; j<opt->nref; ++j ) {
-            opt_ref_t *r = &opt->refs[j];
+            const opt_ref_t *r = &opt->refs[j];
             printf("\t &%-10s \t `%s'\n", r->name, r->val);
         }
         for (j=0; j<opt->nenum; ++j ) {
-            opt_enum_t *e = &opt->enums[j];
+            const opt_enum_t *e = &opt->enums[j];
             printf("\t &%-10s \t %d\n", e->name, e->val);
         }
     }

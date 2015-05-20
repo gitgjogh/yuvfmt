@@ -65,17 +65,21 @@ int yuv_prop_parser(int i, int argc, char *argv[], yuv_seq_t *yuv, int b_help)
     
     opt_desc_t fmt_opt[] = 
     {
-        { "*fmt",    OPT_T_INTI, 1, &yuv->yuvfmt, "%420p", "yuvfmt",  0, n_cmn_fmt, cmn_fmt},
-        { "*wxh",    OPT_T_INTI, 2, yuv->wxh,      0,      "w & h",   n_cmn_wxh, 0, cmn_wxh},
-        { "*nbit",   OPT_T_INTI, 1, &yuv->nbit,   "8",     "",        0, n_cmn_bit, cmn_bit},
-        { "*nlsb",   OPT_T_INTI, 1, &yuv->nlsb,   "0",  ""},
-        { "*tile",   OPT_T_BOOL, 1, &yuv->btile,      0, ""},
-        { "*stride", OPT_T_INTI, 1, &yuv->y_stride,   0, ""},
-        { "*iosize", OPT_T_INTI, 1, &yuv->io_size,    0, ""},
+        { "*fmt",    OPT_T_INTI, 1, &yuv->yuvfmt, "%420p",  "yuvfmt",  },//0, n_cmn_fmt, cmn_fmt},
+        { "*wxh",    OPT_T_INTI, 2, yuv->wxh,        0,     "w & h",   },//n_cmn_wxh, 0, cmn_wxh},
+        { "*nbit",   OPT_T_INTI, 1, &yuv->nbit,     "8",    "",        },//0, n_cmn_bit, cmn_bit},
+        { "*nlsb",   OPT_T_INTI, 1, &yuv->nlsb,     "0",    ""},
+        { "*tile",   OPT_T_BOOL, 1, &yuv->btile,     0,     ""},
+        { "*stride", OPT_T_INTI, 1, &yuv->y_stride,  0,     ""},
+        { "*iosize", OPT_T_INTI, 1, &yuv->io_size,   0,     ""},
     };
     const int n_fmt_opt = ARRAY_SIZE(fmt_opt);
     
     ENTER_FUNC();
+
+    cmdl_set_enum(n_fmt_opt, fmt_opt, "fmt", n_cmn_fmt, cmn_fmt); 
+    cmdl_set_ref (n_fmt_opt, fmt_opt, "wxh", n_cmn_wxh, cmn_wxh); 
+    cmdl_set_enum(n_fmt_opt, fmt_opt, "nbit", n_cmn_bit, cmn_bit); 
     
     if (b_help) {
         cmdl_help(n_fmt_opt, fmt_opt);
