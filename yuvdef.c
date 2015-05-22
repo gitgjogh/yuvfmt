@@ -140,6 +140,10 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
     yuv->nlsb       = nlsb;
     yuv->btile      = btile;
 
+    if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV) {
+        w *= 2;
+    }
+
     if (btile) 
     {
         tile_t *t = &yuv->tile; 
@@ -149,7 +153,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
         if (yuv->nbit == 8) { 
             t->tw = 8; t->th = 4; t->tsz = 32;
         } else {
-            xerr("not support bitdepth (%d) for tile mode\n", yuv->nbit);
+            xerr("not supported bitdepth (%d) for tile mode\n", yuv->nbit);
             t->tw = 8; t->th = 4; t->tsz = 64;
         }
         
@@ -160,13 +164,13 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
     } 
     else 
     {
-        yuv->y_stride = sat_div(yuv->width * yuv->nbit, 8);
+        yuv->y_stride = sat_div(w * yuv->nbit, 8);
         yuv->y_stride = max(stride,  yuv->y_stride);
         
         yuv->y_size = yuv->y_stride * yuv->height;
     }
     
-    if      (fmt == YUVFMT_400P)
+    if (fmt == YUVFMT_400P || fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
     {
         yuv->uv_stride  = 0;
         yuv->uv_size    = 0;
@@ -191,14 +195,6 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
         yuv->uv_stride  = yuv->y_stride / 2;
         yuv->uv_size    = yuv->y_size   / 2;
         yuv->io_size    = yuv->y_size + 2 * yuv->uv_size;
-    }
-    else if (fmt == YUVFMT_UYVY || fmt == YUVFMT_YUYV)
-    {
-        yuv->y_stride   = yuv->y_stride * 2; 
-        yuv->y_size     = yuv->y_size   * 2;
-        yuv->uv_stride  = 0;
-        yuv->uv_size    = 0;
-        yuv->io_size    = yuv->y_size;
     }
     
     yuv->io_size = max(io_size, yuv->io_size);
