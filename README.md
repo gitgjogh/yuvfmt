@@ -1,7 +1,7 @@
 yuv format convertor
 =====================
 
-A YUV convertor which (may/would) support translation format during
+A YUV tool which (may/would) support format conversion during
 
 	- 400P/420P/420SP/420ASP/422P/UYVY/YUVY
 	- 8bit/10bit/16bit
