@@ -91,24 +91,20 @@ typedef struct _yuv_seq
 {
     int     width;
     int     height;
-    int     wxh[2];
     int     yuvfmt;
     int     nbit;
     int     nlsb;
     int     btile;
     
     tile_t  tile;
-    int     y_stride;
-    int     uv_stride;
+    int     y_stride;       //!< cfg-able
+    int     uv_stride;      //!< un-cfg-able, y_stride or y_stride/2
     
-    int     y_size;
-    int     uv_size;
-    int     io_size;
+    int     y_size;         //!< un-cfg-able, y_stride * y_height
+    int     uv_size;        //!< un-cfg-able, uv_stride * uv_height
+    int     io_size;        //!< cfg-able
     int     buf_size;
     uint8_t *pbuf;
-    
-    //char*   path;
-    //FILE*   fp;
 
 } yuv_seq_t;
 

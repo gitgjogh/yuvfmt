@@ -62,11 +62,12 @@ const int n_cmn_bit = ARRAY_SIZE(cmn_bit);
 int yuv_prop_parser(int i, int argc, char *argv[], yuv_seq_t *yuv, int b_help)
 {
     int r = 0, j = 0;
+    int wxh[2] = {0};
     
     opt_desc_t fmt_opt[] = 
     {
         { "*fmt",    OPT_T_INTI, 1, &yuv->yuvfmt, "%420p",  "yuvfmt",  },//0, n_cmn_fmt, cmn_fmt},
-        { "*wxh",    OPT_T_INTI, 2, yuv->wxh,        0,     "w & h",   },//n_cmn_wxh, 0, cmn_wxh},
+        { "*wxh",    OPT_T_INTI, 2, wxh,        0,     "w & h",   },//n_cmn_wxh, 0, cmn_wxh},
         { "*nbit",   OPT_T_INTI, 1, &yuv->nbit,     "8",    "",        },//0, n_cmn_bit, cmn_bit},
         { "*nlsb",   OPT_T_INTI, 1, &yuv->nlsb,     "0",    ""},
         { "*tile",   OPT_T_BOOL, 1, &yuv->btile,     0,     ""},
@@ -102,6 +103,8 @@ int yuv_prop_parser(int i, int argc, char *argv[], yuv_seq_t *yuv, int b_help)
             xerr("fmt_arg_check() failed (%d)\n\n", r);
             return -j;
         }
+        wxh[0] ? (yuv->width = wxh[0]) : 0;
+        wxh[1] ? (yuv->height = wxh[1]) : 0;
         r = cmdl_result(n_fmt_opt, fmt_opt);
         
         return j;
@@ -240,12 +243,10 @@ int fmt_arg_check(fmt_opt_t *cfg, int argc, char *argv[])
                 cfg->frame_range[0], cfg->frame_range[1]);
         return -1;
     }
-    if (!psrc->wxh[0] || !psrc->wxh[1]) {
+    if (!psrc->width || !psrc->height) {
         xerr("@cmdl>> Invalid resolution for src\n");
         return -1;
     }
-    psrc->width = psrc->wxh[0];
-    psrc->height = psrc->wxh[1];
     if ((psrc->nbit != 8 && psrc->nbit!=10 && psrc->nbit!=16) ||
         (psrc->nbit < psrc->nlsb)) {
         xerr("@cmdl>> Invalid bitdepth (%d/%d) for src\n", 
