@@ -79,4 +79,8 @@ int cvt_arg_help();
 int yuv_cvt(int argc, char **argv);
 
 
+int yuv_copy_rect(int w, int h, uint8_t *dst, int dst_stride, 
+                                uint8_t *src, int src_stride);
+int yuv_copy_frame(yuv_seq_t *pdst, yuv_seq_t *psrc);
+
 #endif  // __YUVCVT_H__

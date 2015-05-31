@@ -154,6 +154,8 @@ int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
     int y;
 
     ENTER_FUNC();
+    show_yuv_prop(psrc, SLOG_DBG, "src ");
+    show_yuv_prop(pdst, SLOG_DBG, "dst ");
     
     assert((psrc->nbit==8 && pdst->nbit==8) || (psrc->nbit==16 && pdst->nbit==16));
     assert(is_mch_planar(src_fmt));
@@ -267,6 +269,8 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     int x, y;
 
     ENTER_FUNC();
+    show_yuv_prop(itl, SLOG_DBG, "itl ");
+    show_yuv_prop(spl, SLOG_DBG, "spl ");
     
     assert(itl->nbit==8 && spl->nbit==8);
     assert(is_mch_mixed(itl->yuvfmt));
@@ -686,6 +690,72 @@ int b16_n_b8_cvt_mch(yuv_seq_t *rect16, yuv_seq_t *rect08, int b_clip8)
     return 0;
 }
 
+int yuv_copy_rect(int w, int h, uint8_t *dst, int dst_stride, uint8_t *src, int src_stride)
+{
+    int i = 0;
+    int stride = MIN(dst_stride, src_stride);
+    w = w ? w : stride;
+    w = MIN(w, stride);
+    for (i=0; i<h; ++i) {
+        memcpy(dst, src, stride);
+        dst += dst_stride;
+        src += src_stride;
+    }
+    return 0;   
+}
+
+int yuv_copy_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
+{
+    ENTER_FUNC();
+    
+    show_yuv_prop(psrc, SLOG_DBG, "src ");
+    show_yuv_prop(pdst, SLOG_DBG, "dst ");
+
+    #define CMP(prop) (psrc->prop != pdst->prop)
+    if (CMP(yuvfmt) || CMP(width) || CMP(height) || CMP(nbit) || CMP(btile)) 
+    {
+        xerr("%s(): diff in basic info\n", __FUNCTION__);
+        return -1;
+    }
+    if (pdst->btile && (CMP(tile.tw) || CMP(tile.th) || CMP(tile.tsz))) 
+    {
+        xerr("%s(): diff in tile mode\n", __FUNCTION__);
+        return -1;
+    }
+
+    uint8_t* src_base = psrc->pbuf;
+    uint8_t* dst_base = pdst->pbuf;
+    int fmt = psrc->yuvfmt;
+    int h   = psrc->height; 
+    
+    yuv_copy_rect(0, h, 
+            dst_base, pdst->y_stride, 
+            src_base, psrc->y_stride);
+
+    if (is_mch_420(fmt) || is_mch_422(fmt))
+    {
+        h /= get_uv_ds_ratio_h(fmt); 
+        src_base   += psrc->y_size;
+        dst_base   += pdst->y_size; 
+        yuv_copy_rect(0, h, 
+                dst_base, pdst->uv_stride, 
+                src_base, psrc->uv_stride);
+        
+        if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+        {
+            src_base   += psrc->uv_size;
+            dst_base   += pdst->uv_size;
+            yuv_copy_rect(0, h, 
+                    dst_base, pdst->uv_stride, 
+                    src_base, psrc->uv_stride);
+        }
+    }
+    
+    LEAVE_FUNC();
+    
+    return 0;
+}
+
 /**
  *  @param [in] pdst description for target yuv format
  *      The buffer @pdst bound is just for median used. "pdst->pbuf"
@@ -698,6 +768,9 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     yuv_seq_t cfg_src, cfg_dst;
     
     ENTER_FUNC();
+    
+    show_yuv_prop(psrc, SLOG_DBG, "src ");
+    show_yuv_prop(pdst, SLOG_DBG, "dst ");
 
     memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
     memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
@@ -761,9 +834,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     /**
      * fmt convertion.
      */        
-    if (cfg_src.yuvfmt  != cfg_dst.yuvfmt   || 
-        pdst->y_stride  != cfg_dst.y_stride || 
-        pdst->io_size   != cfg_dst.io_size  )
+    if (cfg_src.yuvfmt  != cfg_dst.yuvfmt)
     {
         int nbit = pdst->nbit;
         int nlsb = pdst->nlsb;
@@ -788,26 +859,20 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         }
         
         // uv re-sample
-        if (pdst->yuvfmt    != get_spl_fmt(cfg_dst.yuvfmt) ||
-            pdst->y_stride  != cfg_dst.y_stride || 
-            pdst->io_size   != cfg_dst.io_size  )
+        if (pdst->yuvfmt != get_spl_fmt(cfg_dst.yuvfmt) )
         {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 
-                    cfg_dst.y_stride, cfg_dst.io_size);
+                    get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
             mch_p2p(psrc, pdst); 
         }
 
         // uv interlace
-        if (pdst->yuvfmt    != cfg_dst.yuvfmt   || 
-            pdst->y_stride  != cfg_dst.y_stride || 
-            pdst->io_size   != cfg_dst.io_size   ) 
+        if (pdst->yuvfmt != cfg_dst.yuvfmt)
         {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, nbit, nlsb, TILE_0, 
-                    cfg_dst.y_stride, cfg_dst.io_size);
+                    cfg_dst.yuvfmt, nbit, nlsb, TILE_0, 0, 0);
             if (is_semi_planar(cfg_dst.yuvfmt)) {
                 mch_sp2p(pdst, psrc, INTERLACING);
             } else if (cfg_dst.yuvfmt == YUVFMT_UYVY  || cfg_dst.yuvfmt == YUVFMT_YUYV ) {
@@ -824,8 +889,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         SWAP_SRC_DST();
         if (cfg_dst.btile) {
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_1, 
-                    cfg_dst.y_stride, cfg_dst.io_size);
+                    cfg_dst.yuvfmt, BIT_10, BIT_10, TILE_1, 0, 0);
             b10_tile_unpack_mch(pdst, psrc, B16_2_B10);
         } else {
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
@@ -839,14 +903,22 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
         if (cfg_dst.btile) {
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
-                    cfg_dst.yuvfmt, BIT_8, BIT_8, TILE_1,
-                    cfg_dst.y_stride, cfg_dst.io_size);
+                    cfg_dst.yuvfmt, BIT_8, BIT_8, TILE_1, 0, 0);
             b8_tile_2_mch(pdst, psrc, RECT2TILE);
         }
     }
     else if (cfg_dst.nbit==16)
     {
         //TODO: 
+    }
+
+    // buf re-placement
+    if (pdst->y_stride != cfg_dst.y_stride || 
+        pdst->io_size  != cfg_dst.io_size  )
+    {
+        SWAP_SRC_DST();
+        set_yuv_prop_by_copy(pdst, 1, &cfg_dst);
+        yuv_copy_frame(pdst, psrc); 
     }
     
     LEAVE_FUNC();
@@ -1139,6 +1211,7 @@ int yuv_cvt(int argc, char **argv)
             return -1;
         }
         
+        set_yuv_prop_by_copy(&seq[0], 1, &cfg.src);
         r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
             if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
@@ -1149,7 +1222,6 @@ int yuv_cvt(int argc, char **argv)
             break;
         }
 
-        set_yuv_prop_by_copy(&seq[0], 1, &cfg.src);
         set_yuv_prop_by_copy(&seq[1], 1, &cfg.dst);
         yuv_seq_t *pdst = yuv_cvt_frame(&seq[1], &seq[0]);
         

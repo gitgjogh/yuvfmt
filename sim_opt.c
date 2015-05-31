@@ -31,8 +31,6 @@ int clip(int v, int minv, int maxv)
     return v;
 }
 
-#define CLIP(v, minv, maxv)     ((v) = clip((v), (minv), (maxv)))
-
 int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
 {
     minL = MAX(minL, SLOG_NON);
