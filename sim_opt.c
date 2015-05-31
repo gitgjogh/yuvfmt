@@ -35,8 +35,8 @@ int clip(int v, int minv, int maxv)
 
 int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
 {
-    minL = max(minL, SLOG_NON);
-    maxL = min(maxL, SLOG_ALL);
+    minL = MAX(minL, SLOG_NON);
+    maxL = MIN(maxL, SLOG_ALL);
     if (minL<=maxL) {
         int level;
         for (level = minL; level <= maxL; ++level) {
@@ -855,7 +855,7 @@ int cmdl_result(int optc, opt_desc_t optv[])
     {
         opt_desc_t *opt = &optv[i_opt];
         printf("\t-%s (%c%d) = `", opt->name+1, opt->name[0], opt->n_parse);
-        int narg = max(opt->narg, 1);
+        int narg = MAX(opt->narg, 1);
         for (i_arg=0; i_arg<narg; ++i_arg) {
             cmdl_val2str(opt, i_arg);
             printf("%c", (i_arg==narg-1) ? '\'' : ' ');

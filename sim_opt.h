@@ -20,13 +20,24 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#ifndef max
-#define max(a,b) ((a)>(b) ? (a) : (b))
+#ifndef MAX
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
 #endif
 
-#ifndef min
-#define min(a,b) ((a)<(b) ? (a) : (b))
+#ifndef MIN
+#define MIN(a,b) ((a)<(b) ? (a) : (b))
 #endif
+
+#ifndef CLIP
+#define CLIP(v, min, max) \
+    (((min) > (max)) ? (v) : (((v)<(min)) ? (min) : ((v)>(max) ? (max) : (v))))
+#endif
+
+#define BE_IN_RANGE(v, min, max) \
+    (((min)<=(max)) && ((min)<=(v)) && ((max)>=(v)))
+    
+int be_in_range(int v, int min, int max);
+int clip(int v, int minv, int maxv);
 
 typedef enum slog_level {
     SLOG_NON        = 0,

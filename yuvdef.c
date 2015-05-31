@@ -20,6 +20,10 @@
 
 #include "yuvdef.h"
 
+int be_in_range(int min, int max, int v)
+{
+    return (((min)<=(max)) && ((min)<=(v)) && ((max)>=(v)));
+}
 
 int sat_div(int num, int den)
 {
@@ -158,14 +162,14 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
         }
         
         yuv->y_stride = sat_div(w, t->tw) * t->tsz;
-        yuv->y_stride = max(stride,  yuv->y_stride);
+        yuv->y_stride = MAX(stride,  yuv->y_stride);
         
         yuv->y_size = yuv->y_stride * sat_div(h, t->th);
     } 
     else 
     {
         yuv->y_stride = sat_div(w * yuv->nbit, 8);
-        yuv->y_stride = max(stride,  yuv->y_stride);
+        yuv->y_stride = MAX(stride,  yuv->y_stride);
         
         yuv->y_size = yuv->y_stride * yuv->height;
     }
@@ -197,7 +201,7 @@ void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt,
         yuv->io_size    = yuv->y_size + 2 * yuv->uv_size;
     }
     
-    yuv->io_size = max(io_size, yuv->io_size);
+    yuv->io_size = MAX(io_size, yuv->io_size);
     if (b_realloc) {
         yuv_buf_realloc(yuv, yuv->io_size);
     }
