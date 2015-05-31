@@ -106,6 +106,30 @@ void swap_uv(uint8_t **u, uint8_t **v)
     *v = m;
 }
 
+int get_uv_ds_ratio_w(int fmt)
+{
+    if (is_semi_planar(fmt)) {
+        return 1;
+    } else 
+    if (is_mch_planar(fmt)) {
+        return 2;
+    }
+    
+    return 0;
+}
+
+int get_uv_ds_ratio_h(int fmt)
+{
+    if (is_mch_422(fmt)) {
+        return 1;
+    } else 
+    if (is_mch_420(fmt)) {
+        return 2;
+    }
+
+    return 0;
+}
+
 int get_uv_width(yuv_seq_t *yuv)
 {
     int fmt = yuv->yuvfmt;

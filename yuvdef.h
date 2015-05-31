@@ -124,6 +124,8 @@ int get_spl_fmt(int fmt);
 void swap_uv(uint8_t **u, uint8_t **v);
 int get_uv_width(yuv_seq_t *yuv);
 int get_uv_height(yuv_seq_t *yuv);
+int get_uv_ds_ratio_w(int fmt);
+int get_uv_ds_ratio_h(int fmt);
 
 void set_yuv_prop(yuv_seq_t *yuv, int b_realloc, int w, int h, int fmt, 
                     int nbit, int nlsb, int btile, 
