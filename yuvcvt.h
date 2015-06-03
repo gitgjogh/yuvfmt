@@ -83,4 +83,11 @@ int yuv_copy_rect(int w, int h, uint8_t *dst, int dst_stride,
                                 uint8_t *src, int src_stride);
 int yuv_copy_frame(yuv_seq_t *pdst, yuv_seq_t *psrc);
 
+int get_roi_shift_y(yuv_seq_t *yuv);
+int get_roi_shift_uv(yuv_seq_t *yuv);
+uint8_t *get_roi_base_y(yuv_seq_t *yuv);
+uint8_t *get_roi_base_uv(yuv_seq_t *yuv);
+int yuv_copy_roi(yuv_seq_t *psrc, yuv_seq_t *pdst);
+
+
 #endif  // __YUVCVT_H__

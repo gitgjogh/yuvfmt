@@ -87,6 +87,14 @@ typedef struct _tile
 
 } tile_t;
 
+typedef struct _rect
+{
+    union {
+        struct  {int x,y,w,h;};
+        int     v[4];
+    };
+} rect_t;
+
 typedef struct _yuv_seq 
 {
     int     width;
@@ -105,6 +113,8 @@ typedef struct _yuv_seq
     int     io_size;        //!< cfg-able
     int     buf_size;
     uint8_t *pbuf;
+
+    rect_t  roi;
 
 } yuv_seq_t;
 

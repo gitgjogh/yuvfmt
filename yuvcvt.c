@@ -707,7 +707,6 @@ int yuv_copy_rect(int w, int h, uint8_t *dst, int dst_stride, uint8_t *src, int 
 int yuv_copy_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     ENTER_FUNC();
-    
     show_yuv_prop(psrc, SLOG_DBG, "src ");
     show_yuv_prop(pdst, SLOG_DBG, "dst ");
 
@@ -756,6 +755,124 @@ int yuv_copy_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     return 0;
 }
 
+int get_roi_shift_y(yuv_seq_t *yuv)
+{
+    int nbyte = yuv->nbit / 8;
+    return yuv->y_stride * yuv->roi.y 
+                 + nbyte * yuv->roi.x;
+}
+
+int get_roi_shift_uv(yuv_seq_t *yuv)
+{
+    int nbyte = yuv->nbit / 8;
+    int ds_w = get_uv_ds_ratio_w(yuv->yuvfmt);
+    int ds_h = get_uv_ds_ratio_h(yuv->yuvfmt);
+    ds_w = ds_w ? ds_w : 1;
+    ds_h = ds_h ? ds_h : 1;
+    
+    return yuv->uv_stride * yuv->roi.y / ds_w 
+                  + nbyte * yuv->roi.x / ds_h;
+}
+
+uint8_t *get_roi_base_y(yuv_seq_t *yuv)
+{
+    return (uint8_t *)yuv->pbuf + get_roi_shift_y(yuv);
+}
+
+uint8_t *get_roi_base_uv(yuv_seq_t *yuv)
+{
+    return (uint8_t *)yuv->pbuf + get_roi_shift_uv(yuv) + yuv->y_size;
+}
+
+/**
+ *  @brief copy psrc->roi to pdst->roi
+ */
+int yuv_copy_roi(yuv_seq_t *psrc, yuv_seq_t *pdst)
+{
+    ENTER_FUNC();
+    show_yuv_prop(psrc, SLOG_DBG, "src ");
+    show_yuv_prop(pdst, SLOG_DBG, "dst ");
+
+    #define CMP(prop) (psrc->prop != pdst->prop)
+    if (CMP(yuvfmt) || CMP(width) || CMP(height) || CMP(nbit) || CMP(btile)) 
+    {
+        xerr("%s(): diff in basic info\n", __FUNCTION__);
+        return -1;
+    }
+    if (pdst->btile) 
+    {
+        xerr("%s(): not support tile fmt\n", __FUNCTION__);
+        return -1;
+    }
+    if (pdst->nbit != 16 && pdst->nbit != 8)
+    {
+        xerr("%s(): nbit=%d, not in {16,8}\n", __FUNCTION__, pdst->nbit);
+        return -1; 
+    }
+
+    int nbyte = pdst->nbit / 8;
+    uint8_t* src_base = get_roi_base_y(psrc);
+    uint8_t* dst_base = get_roi_base_y(pdst);
+    int fmt = psrc->yuvfmt;
+    
+    pdst->roi.w = psrc->roi.w;
+    pdst->roi.h = psrc->roi.h;
+    assert(is_valid_roi(psrc->width, psrc->height, &psrc->roi));
+    assert(is_valid_roi(pdst->width, pdst->height, &pdst->roi));
+    
+    int roi_w = nbyte * psrc->roi.w;
+    int roi_h = psrc->roi.h;
+    
+    yuv_copy_rect(roi_w, roi_h,
+            dst_base, pdst->y_stride, 
+            src_base, psrc->y_stride);
+
+    if (is_mch_420(fmt) || is_mch_422(fmt))
+    {
+        roi_w /= get_uv_ds_ratio_w(fmt);
+        roi_h /= get_uv_ds_ratio_h(fmt);
+        
+        src_base = get_roi_base_uv(psrc);
+        dst_base = get_roi_base_uv(pdst);
+        
+        yuv_copy_rect(roi_w, roi_h,
+                dst_base, pdst->y_stride, 
+                src_base, psrc->y_stride);
+                
+        if (fmt == YUVFMT_420P || fmt == YUVFMT_422P)
+        {
+            src_base += psrc->uv_size;
+            dst_base += pdst->uv_size;
+            
+            yuv_copy_rect(roi_w, roi_h,
+                    dst_base, pdst->y_stride, 
+                    src_base, psrc->y_stride);
+        }
+    }
+    
+    LEAVE_FUNC();
+    
+    return 0;
+}
+
+int not_null_roi(rect_t *roi)
+{
+    return (roi && (roi->x||roi->y||roi->w||roi->h));
+}
+
+int is_valid_roi(int w, int h, rect_t *roi)
+{
+    if (w && h && not_null_roi(roi) &&
+            be_in_range(0, w, roi->x) &&
+            be_in_range(0, w, roi->x + roi->w) &&
+            be_in_range(0, h, roi->y) &&
+            be_in_range(0, h, roi->y + roi->h)) 
+    {
+        return 1;
+    }
+    return 0;
+}
+
 /**
  *  @param [in] pdst description for target yuv format
  *      The buffer @pdst bound is just for median used. "pdst->pbuf"
@@ -768,9 +885,8 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
     yuv_seq_t cfg_src, cfg_dst;
     
     ENTER_FUNC();
-    
-    show_yuv_prop(psrc, SLOG_DBG, "src ");
     show_yuv_prop(pdst, SLOG_DBG, "dst ");
+    show_yuv_prop(psrc, SLOG_DBG, "src ");
 
     memcpy(&cfg_src, psrc, sizeof(yuv_seq_t));
     memcpy(&cfg_dst, pdst, sizeof(yuv_seq_t));
