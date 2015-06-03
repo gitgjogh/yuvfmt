@@ -380,7 +380,9 @@ int cmp_arg_help()
         printf("\t -%%%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
     }
     printf("\n-fmt option can be short as follow:\n");
-    printf("\t -%%420p = \"-fmt %%420p\"\n");
+    for (j=0; j<n_cmn_fmt; ++j) {
+        printf("\t -%%%-7s = \"-fmt %d (%%%-7s)\"\n", cmn_fmt[j].name, cmn_fmt[j].val, cmn_fmt[j].name);
+    }
     return 0;
 }
 

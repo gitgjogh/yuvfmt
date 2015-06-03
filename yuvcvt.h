@@ -87,7 +87,7 @@ int get_roi_shift_y(yuv_seq_t *yuv);
 int get_roi_shift_uv(yuv_seq_t *yuv);
 uint8_t *get_roi_base_y(yuv_seq_t *yuv);
 uint8_t *get_roi_base_uv(yuv_seq_t *yuv);
-int yuv_copy_roi(yuv_seq_t *psrc, yuv_seq_t *pdst);
+int yuv_copy_roi(yuv_seq_t *pdst, yuv_seq_t *psrc);
 
 
 #endif  // __YUVCVT_H__

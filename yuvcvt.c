@@ -325,9 +325,9 @@ int b8_mch_yuyv2p(yuv_seq_t *itl, yuv_seq_t *spl, int b_interlacing)
     return 0;
 }
 
-int b16_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+int b16_mch_p2p(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
-    return b8_mch_p2p(psrc, pdst);
+    return b8_mch_p2p(pdst, psrc);
 }
 
 /**
@@ -486,7 +486,7 @@ int b16_rect_scale
     return 0;
 }
 
-int b16_mch_scale(yuv_seq_t *psrc, yuv_seq_t *pdst)
+int b16_mch_scale(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     uint8_t* src_base = psrc->pbuf;
     uint8_t* dst_base = pdst->pbuf;
@@ -787,7 +787,7 @@ uint8_t *get_roi_base_uv(yuv_seq_t *yuv)
 /**
  *  @brief copy psrc->roi to pdst->roi
  */
-int yuv_copy_roi(yuv_seq_t *psrc, yuv_seq_t *pdst)
+int yuv_copy_roi(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     ENTER_FUNC();
     show_yuv_prop(psrc, SLOG_DBG, "src ");
@@ -943,7 +943,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
                     cfg_src.yuvfmt, BIT_16, BIT_16, TILE_0, 0, 0);
-            b16_mch_scale(psrc, pdst);
+            b16_mch_scale(pdst, psrc);
         } 
     }
 
@@ -968,9 +968,9 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
                     get_spl_fmt(cfg_src.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
             if (is_semi_planar(cfg_src.yuvfmt)) {
-                mch_sp2p(psrc, pdst, SPLITTING);
+                mch_sp2p(pdst, psrc, SPLITTING);
             } else if (cfg_src.yuvfmt == YUVFMT_UYVY || cfg_src.yuvfmt == YUVFMT_YUYV) {
-                mch_yuyv2p(psrc, pdst, SPLITTING);
+                mch_yuyv2p(pdst, psrc, SPLITTING);
             }
         }
         
@@ -980,7 +980,7 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
             SWAP_SRC_DST();
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
                     get_spl_fmt(cfg_dst.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
-            mch_p2p(psrc, pdst); 
+            mch_p2p(pdst, psrc); 
         }
 
         // uv interlace
@@ -1269,11 +1269,9 @@ int cvt_arg_help()
         printf("\t -%%%-4s = \"-wxh %4dx%-4d\"\n", cmn_res[j].name, cmn_res[j].w, cmn_res[j].h);
     }
     printf("\n-fmt option can be short as follow:\n");
-    printf("\t -%%420p = \"-fmt %%420p\"\n");
-    //printf("\nfmt can be short as follow:\n");
-    //for (j=0; j<n_cmn_fmt; ++j) {
-    //    printf("\t -%-7s : %2d\n", cmn_fmt[j].name, cmn_fmt[j].val);
-    //}
+    for (j=0; j<n_cmn_fmt; ++j) {
+        printf("\t -%%%-7s = \"-fmt %d (%%%-7s)\"\n", cmn_fmt[j].name, cmn_fmt[j].val, cmn_fmt[j].name);
+    }
     return 0;
 }
 
