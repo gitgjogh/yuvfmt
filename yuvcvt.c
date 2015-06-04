@@ -133,7 +133,7 @@ int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
 /** 
  *  422p <-> 420p uv down/up sampling
  */
-int b8_mch_p2p(yuv_seq_t *psrc, yuv_seq_t *pdst)
+int b8_mch_p2p(yuv_seq_t *pdst, yuv_seq_t *psrc)
 {
     int src_fmt = psrc->yuvfmt;
     int dst_fmt = pdst->yuvfmt;
@@ -968,9 +968,9 @@ yuv_seq_t *yuv_cvt_frame(yuv_seq_t *pdst, yuv_seq_t *psrc)
             set_yuv_prop(pdst, 1, cfg_src.width, cfg_src.height, 
                     get_spl_fmt(cfg_src.yuvfmt), nbit, nlsb, TILE_0, 0, 0);
             if (is_semi_planar(cfg_src.yuvfmt)) {
-                mch_sp2p(pdst, psrc, SPLITTING);
+                mch_sp2p(psrc, pdst, SPLITTING);
             } else if (cfg_src.yuvfmt == YUVFMT_UYVY || cfg_src.yuvfmt == YUVFMT_YUYV) {
-                mch_yuyv2p(pdst, psrc, SPLITTING);
+                mch_yuyv2p(psrc, pdst, SPLITTING);
             }
         }
         
