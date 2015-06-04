@@ -19,25 +19,7 @@
 
 #include <stdint.h>
 #include <stdarg.h>
-
-#ifndef MAX
-#define MAX(a,b) ((a)>(b) ? (a) : (b))
-#endif
-
-#ifndef MIN
-#define MIN(a,b) ((a)<(b) ? (a) : (b))
-#endif
-
-#ifndef CLIP
-#define CLIP(v, min, max) \
-    (((min) > (max)) ? (v) : (((v)<(min)) ? (min) : ((v)>(max) ? (max) : (v))))
-#endif
-
-#define BE_IN_RANGE(v, min, max) \
-    (((min)<=(max)) && ((min)<=(v)) && ((max)>=(v)))
-    
-int be_in_range(int v, int min, int max);
-int clip(int v, int minv, int maxv);
+#include "sim_utils.h"
 
 typedef enum slog_level {
     SLOG_NON        = 0,
@@ -98,9 +80,6 @@ static int fcall_layer = 0;
 #define SAFE_STR(s, nnstr)      ((s)?(s):(nnstr))
 
 
-#ifndef MAX_PATH
-#define MAX_PATH    256
-#endif
 #define MAX_MODE    8
 typedef struct file_io {
     int     b_used;
@@ -120,8 +99,11 @@ int     ios_feof(ios_t *p, int ich);
 
 #define GET_ARGV(idx, name) get_argv(argc, argv, idx, name);
 char*   get_argv(int argc, char *argv[], int i, const char *name);
-char*   get_uint32 (char *str, uint32_t *out);
 
+/**
+ *  \param [in] i The idx of curr param to be parsed. 
+ *  \return The idx of the next param to be parsed.
+ */
 int     arg_parse_range(int i, int argc, char *argv[], int i_range[2]);
 int     arg_parse_str(int i, int argc, char *argv[], char **p);
 int     arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz);

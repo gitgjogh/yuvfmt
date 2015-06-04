@@ -20,30 +20,6 @@
 
 #include "yuvdef.h"
 
-int be_in_range(int min, int max, int v)
-{
-    return (((min)<=(max)) && ((min)<=(v)) && ((max)>=(v)));
-}
-
-int sat_div(int num, int den)
-{
-    return (num + den - 1)/den;
-}
-
-
-int bit_sat(int nbit, int val)
-{
-    int pad = (1<<nbit) - 1;
-    return (val+pad) & (~pad);
-}
-
-
-int is_bit_aligned(int nbit, int val)
-{
-    int pad = (1<<nbit) - 1;
-    return (val&pad)==0;
-}
-
 
 int is_mch_420(int fmt)
 {

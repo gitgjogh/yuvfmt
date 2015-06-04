@@ -167,12 +167,14 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     ENTER_FUNC();
     
     if (argc<2) {
+        xerr("No arg specified.\n");
         return -1;
     }
-    if (0 != strcmp(argv[1], "-i0") && 0 != strcmp(argv[1], "-i1") &&
-        0 != strcmp(argv[1], "-h")  && 0 != strcmp(argv[1], "-help") &&
-        0 != strcmp(argv[1], "-x")  && 0 != strcmp(argv[1], "-xall"))
+
+    const char* start_opts = "h, help, i0, i1, x, xl, xlevel, xall, xnon";
+    if (argv[1][0]!='-' || 0 > search_in_fields(argv[1], start_opts))
     {
+        xerr("1st opt not in `%s`\n", start_opts);
         return -1;
     }
 
@@ -183,7 +185,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
     {
         char *arg = argv[i];
         if (arg[0]!='-') {
-            xerr("@cmdl>> unrecognized arg `%s`\n", arg);
+            xerr("`%s` is not an option\n", arg);
             return -i;
         }
         
@@ -212,7 +214,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
                 ++i; continue;
             }
 
-            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            xerr("Unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
             return -i;
         }
         
@@ -290,8 +292,8 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             xlevel(level);
         } else
         {
-            xerr("@cmdl>> invalid opt `%s`\n", arg);
-            return -i;
+            xerr("Unrecognized opt `%s`\n", arg);
+            return 1-i;
         }
     }
     
@@ -361,11 +363,10 @@ int cmp_arg_close(cmp_opt_t *cfg)
 
 int cmp_arg_help()
 {
-    printf("yuv sequences comparation. Options\n");
-    printf("-wxh <%%dx%%d>\n");
-    printf("-i0 name<%%s> {...yuv props...} \n");
-    printf("-i1 name<%%s> {...yuv props...} \n");
-    printf("-o  name<%%s> {...yuv props...} \n");
+    printf("yuv sequences comparation. Options:\n");
+    printf("\t-wxh <%%dx%%d>\n");
+    printf("\t-i0 name<%%s> {...yuv props...} \n");
+    printf("\t-i1 name<%%s> {...yuv props...} \n");
     printf("\n...yuv props...\n");
     printf("\t [-fmt <%%420p,%%420sp,%%uyvy,%%422p>]\n");
     printf("\t [-wxh <%%d>x<%%d>]\n");
@@ -405,13 +406,12 @@ int yuv_cmp(int argc, char **argv)
         //help exit
         return 0;
     } else if (r < 0) {
-        xerr("cmp_arg_parse() failed\n");
-        cmp_arg_help();
+        // xerr("cmp_arg_parse() failed\n");
         return 1;
     }
     r = cmp_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        xerr("cmp_arg_check() failed\n");
+        // xerr("cmp_arg_check() failed\n");
         return 1;
     }
 

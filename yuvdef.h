@@ -21,14 +21,6 @@
 #include <stdint.h>
 #include "sim_opt.h"
 
-#ifndef MAX_PATH
-#define MAX_PATH 256
-#endif
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a)   (sizeof(a)/sizeof(a[0]))
-#endif
-
 
 #ifndef ENTER_FUNC
 #define ENTER_FUNC()    do{} while(0)
@@ -118,10 +110,6 @@ typedef struct _yuv_seq
 
 } yuv_seq_t;
 
-
-int sat_div(int num, int den);
-int bit_sat(int nbit, int val);
-int is_bit_aligned(int nbit, int val);
 
 int is_mch_420(int fmt);
 int is_mch_422(int fmt);

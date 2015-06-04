@@ -68,7 +68,7 @@ int arg_parse_wxh(int i, int argc, char *argv[], int *pw, int *ph)
     pw = pw ? pw : &w;
     ph = ph ? ph : &h;
     
-    char *arg = GET_ARGV(++ i, "wxh");
+    char *arg = GET_ARGV(i, "wxh");
     if (!arg) {
         return -1;
     }
@@ -108,7 +108,7 @@ int arg_parse_fmt(int i, int argc, char *argv[], int *fmt)
 {
     int j;
     
-    char *arg = GET_ARGV(++ i, "yuvfmt");
+    char *arg = GET_ARGV(i, "yuvfmt");
     if (!arg) {
         return -1;
     }
@@ -863,10 +863,10 @@ int not_null_roi(rect_t *roi)
 int is_valid_roi(int w, int h, rect_t *roi)
 {
     if (w && h && not_null_roi(roi) &&
-            be_in_range(0, w, roi->x) &&
-            be_in_range(0, w, roi->x + roi->w) &&
-            be_in_range(0, h, roi->y) &&
-            be_in_range(0, h, roi->y + roi->h)) 
+            is_in_range(0, w, roi->x) &&
+            is_in_range(0, w, roi->x + roi->w) &&
+            is_in_range(0, h, roi->y) &&
+            is_in_range(0, h, roi->y + roi->h)) 
     {
         return 1;
     }
@@ -1059,12 +1059,14 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     ENTER_FUNC();
     
     if (argc<2) {
+        xerr("No arg specified.\n");
         return -1;
     }
-    if (0 != strcmp(argv[1], "-dst") && 0 != strcmp(argv[1], "-src") &&
-        0 != strcmp(argv[1], "-h")   && 0 != strcmp(argv[1], "-help") &&
-        0 != strcmp(argv[1], "-x")   && 0 != strcmp(argv[1], "-xall"))
+    
+    const char* start_opts = "h, help, i, src, o, dst, x, xl, xlevel, xall, xnon";
+    if (argv[1][0]!='-' || 0 > search_in_fields(argv[1], start_opts))
     {
+        xerr("1st opt not in `%s`\n", start_opts);
         return -1;
     }
 
@@ -1075,7 +1077,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     {
         char *arg = argv[i];
         if (arg[0]!='-') {
-            xerr("@cmdl>> unrecognized arg `%s`\n", arg);
+            xerr("`%s` is not an option\n", arg);
             return -i;
         }
         
@@ -1104,23 +1106,24 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
                 ++i; continue;
             }
 
-            xerr("unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
+            xerr("Unknown enum or ref %s used in %s\n", arg, __FUNCTION__);
             return -i;
         }
         
         arg += 1;
+        ++i;
 
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cvt_arg_help();
             return 0;
         } else
-        if (0==strcmp(arg, "src")) {
+        if (0==strcmp(arg, "i") || 0==strcmp(arg, "src")) {
             char *path = 0;
             seq = &cfg->src;
             i = arg_parse_str(i, argc, argv, &path);
             ios_cfg(cfg->ios, CVT_IOS_SRC, path, "rb");
         } else
-        if (0==strcmp(arg, "dst")) {
+        if (0==strcmp(arg, "o") || 0==strcmp(arg, "dst")) {
             char *path = 0;
             seq = &cfg->dst;
             i = arg_parse_str(i, argc, argv, &path);
@@ -1174,8 +1177,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             xlevel(level);
         } else
         {
-            xerr("@cmdl>> invalid opt `%s`\n", arg);
-            return -i;
+            xerr("Unrecognized opt `%s`\n", arg);
+            return 1-i;
         }
     }
     
@@ -1246,8 +1249,8 @@ int cvt_arg_close(cvt_opt_t *cfg)
 int cvt_arg_help()
 {
     printf("yuv format convertor. Options:\n");
-    printf("\t -dst name<%%s> {...props...}\n");
-    printf("\t -src name<%%s> {...props...}\n");
+    printf("\t -i|-dst name<%%s> {...props...}\n");
+    printf("\t -o|-src name<%%s> {...props...}\n");
     printf("\t -f   <%%d~%%d>\n");
     
     printf("\nset yuv props as follow:\n");
@@ -1290,14 +1293,12 @@ int yuv_cvt(int argc, char **argv)
         //help exit
         return 0;
     } else if (r < 0) {
-        xerr("cvt_arg_parse() failed\n");
-        cvt_arg_help();
+        // xerr("cvt_arg_parse() failed\n");
         return 1;
     }
     r = cvt_arg_check(&cfg, argc, argv);
     if (r < 0) {
-        xerr("cvt_arg_check() failed\n");
-        cvt_arg_help();
+        // xerr("cvt_arg_check() failed\n");
         return 1;
     }
     
@@ -1308,7 +1309,7 @@ int yuv_cvt(int argc, char **argv)
         seq[i].buf_size = w_align * h_align * 3 * nbyte;
         seq[i].pbuf = (uint8_t *)malloc(seq[i].buf_size);
         if(!seq[i].pbuf) {
-            xerr("error: malloc seq[%d] fail\n", i);
+            xerr("malloc for seq[%d] failed\n", i);
             return -1;
         }
     }

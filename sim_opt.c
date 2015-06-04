@@ -24,12 +24,6 @@
 static slog_t  g_slog_obj = { 0 };
 // static slog_t *g_slog_ptr = &g_slog_obj;
 
-int clip(int v, int minv, int maxv)
-{
-    v = (v<minv) ? minv : v;
-    v = (v>maxv) ? maxv : v;
-    return v;
-}
 
 int slog_set_range(slog_t *sl, int minL, int maxL, void *fp)
 {
@@ -198,10 +192,10 @@ int ios_open(ios_t ios[], int nch, int *nop)
                 if (fp) {
                     char yes_or_no = 0;
                     fclose(fp); fp =0;
-                    printf("file `%s' already exist, overwrite? (y/n) : ", f->path);
+                    printf("file `%s` already exist, overwrite? (y/n) : ", f->path);
                     int r = scanf("%c", &yes_or_no);
                     if (r!=1 || yes_or_no != 'y') {
-                        printf("file `%s' would be skipped\n", f->path);
+                        printf("file `%s` would be skipped\n", f->path);
                         continue;
                     }
                 }
@@ -247,31 +241,16 @@ char *get_argv(int argc, char *argv[], int i, const char *name)
     int s = (argv && i<argc) ? argv[i][0] : 0;
     char *arg = (s != 0 && s != '-') ? argv[i] : 0;
     if (name) {
-        xlog(SLOG_CMDL, "@cmdl>> -%s[%d] = `%s'\n", SAFE_STR(name,""), i, SAFE_STR(arg,""));
+        xlog(SLOG_CMDL, "@cmdl>> -%s[%d] = `%s`\n", SAFE_STR(name,""), i, SAFE_STR(arg,""));
     }
     return arg;
-}
-
-char* get_uint32 (char *str, uint32_t *out)
-{
-    char  *curr = str;
-    
-    if ( curr ) {
-        int  c, sum;
-        for (sum=0, curr=str; (c = *curr) && c >= '0' && c <= '9'; ++ curr) {
-            sum = sum * 10 + ( c - '0' );
-        }
-        if (out) { *out = sum; }
-    }
-
-    return curr;
 }
 
 int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
 {
     char *flag=0;
     char *last=0;
-    char *arg = GET_ARGV(++i, "range");
+    char *arg = GET_ARGV(i, "range");
     if (!arg) {
         return -1;
     }
@@ -309,14 +288,14 @@ int arg_parse_range(int i, int argc, char *argv[], int i_range[2])
 
 int arg_parse_str(int i, int argc, char *argv[], char **p)
 {
-    char *arg = GET_ARGV(++ i, "string");
+    char *arg = GET_ARGV(i, "string");
     *p = arg ? arg : 0;
     return arg ? ++i : -1;
 }
 
 int arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz)
 {
-    char *arg = GET_ARGV(++ i, "string");
+    char *arg = GET_ARGV(i, "string");
     if (arg) {
         strncpy(buf, arg, nsz);
         buf[nsz-1] = 0;
@@ -328,16 +307,46 @@ int arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz)
 
 int arg_parse_int(int i, int argc, char *argv[], int *p)
 {
-    char *arg = GET_ARGV(++ i, "int");
+    char *arg = GET_ARGV(i, "int");
     *p = arg ? atoi(arg) : 0;
     return arg ? ++i : -1;
 }
 
 int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
 {
-    char *arg = GET_ARGV(++ i, "int");
+    char *arg = GET_ARGV(i, "int");
     *p = arg ? atoi(arg) : default_val;
     return arg ? ++i : i;
+}
+
+int arg_parse_ints(int i, int argc, char *argv[], int n, int *p[])
+{
+    int j;
+    for (j=0; j<n; ++j) {
+        char *arg = GET_ARGV(i, "int");
+        if (arg) {
+            *(p[j]) = atoi(arg);
+            ++ i;
+        } else {
+            return -1;
+        }
+    }
+    return i;
+}
+
+int opt_parse_ints(int i, int argc, char *argv[], int n, int *p[])
+{
+    int j;
+    for (j=0; j<n; ++j) {
+        char *arg = GET_ARGV(i, "int");
+        if (arg) {
+            *(p[j]) = atoi(arg);
+            ++ i;
+        } else {
+            *(p[j]) = 0;
+        }
+    }
+    return i;
 }
 
 int arg_parse_xlevel(int i, int argc, char *argv[])
@@ -352,9 +361,9 @@ int arg_parse_xlevel(int i, int argc, char *argv[])
         if (0==strcmp(arg, "xall")) {
             ++i;    xlevel(SLOG_ALL);
         } else
-        if (0==strcmp(arg, "xlevel")) {
+        if (0==strcmp(arg, "xl") || 0==strcmp(arg, "xlevel")) {
             int level;
-            i = arg_parse_int(i, argc, argv, &level);
+            i = arg_parse_int(++i, argc, argv, &level);
             xlevel(level);
         } else
         {
@@ -522,51 +531,6 @@ int cmdl_enum_usable(opt_desc_t *opt)
     return 0;
 }
 
-uint32_t get_token_pos(const char* str, uint32_t search_from,
-                       const char* prejumpset,
-                       const char* delemiters,
-                       uint32_t *stoken_start)
-{
-    uint32_t c, start, end;
-
-    if (prejumpset) 
-    {
-        for (start = search_from; (c = str[start]); ++start) {
-            if ( !strchr(prejumpset, c) ) {
-                break;
-            }
-        }
-    }
-
-    if (stoken_start) {
-        *stoken_start = start;
-    }
-
-    for (end = start; (c = str[end]); ++end) {
-        if ( delemiters && strchr(delemiters, c) ) {
-            break;
-        }
-    }
-
-    return end - start;
-}
-                       
-int cmdl_strspl(char *record, char *fieldArr[], int arrSz)
-{
-    int nkey=0, keylen=0, pos=0;
-    keylen = get_token_pos(record, 0, " ", " ,", &pos);
-    while (keylen && nkey<arrSz) {
-        fieldArr[nkey++] = &record[pos];
-        if (record[pos+keylen] == 0) {
-            break;
-        } else {
-            record[pos+keylen] = 0;
-            keylen = get_token_pos(record, pos+keylen+1, " ,", " ,", &pos);
-        }
-    }
-    return nkey;
-}
-
 int cmdl_getdesc_byref (int optc, opt_desc_t optv[], const char *ref)
 {
     int i, j;
@@ -635,7 +599,7 @@ int cmdl_parse_opt(int i, int argc, char *argv[], opt_desc_t *opt)
         arg = opt->default_val;
         arg_count = arg ? 1 : 0;
         arg_array = &arg;
-        xlog(SLOG_CMDL, "@cmdl>> use default_val `%s'\n", arg ? arg : "nil");
+        xlog(SLOG_CMDL, "@cmdl>> use default_val `%s`\n", arg ? arg : "nil");
     } else {
         opt->b_default = 0;
         arg = get_argv(argc, argv, i, opt->name);
@@ -653,7 +617,7 @@ int cmdl_parse_opt(int i, int argc, char *argv[], opt_desc_t *opt)
             }
             
             strncpy(splbuf, opt->refs[opt->i_ref].val, 1024);
-            arg_count = cmdl_strspl(splbuf, spl, 256);
+            arg_count = str_2_field(splbuf, 256, spl);
             if (arg_count>=256) {
                 xerr("strspl() overflow\n");
                 return -i;
@@ -795,7 +759,7 @@ int cmdl_help(int optc, opt_desc_t optv[])
 
         for (j=0; j<opt->nref; ++j ) {
             const opt_ref_t *r = &opt->refs[j];
-            printf("\t %%%-10s \t `%s'\n", r->name, r->val);
+            printf("\t %%%-10s \t `%s`\n", r->name, r->val);
         }
         for (j=0; j<opt->nenum; ++j ) {
             const opt_enum_t *e = &opt->enums[j];
