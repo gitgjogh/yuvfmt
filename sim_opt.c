@@ -110,6 +110,11 @@ int xdbgv(const char *fmt, va_list ap)
     slogv(&g_slog_obj, SLOG_DBG, 0, fmt, ap);
 }
 
+int xwarnv(const char *fmt, va_list ap)
+{
+    slogv(&g_slog_obj, SLOG_WARN, 0, fmt, ap);
+}
+
 int slog (slog_t *sl, int level, const char *prompt, const char *fmt, ...)
 {
     int r = 0;
@@ -146,7 +151,15 @@ int xdbg (const char *fmt, ...)
     va_end(ap);
     return r;
 }
-
+int xwarn(const char *fmt, ...)
+{
+    int r = 0;
+    va_list ap;
+    va_start(ap, fmt);
+    r = xwarnv(fmt, ap);
+    va_end(ap);
+    return r;
+}
 
 void iof_cfg(ios_t *f, const char *path, const char *mode)
 {
@@ -308,15 +321,24 @@ int arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz)
 int arg_parse_int(int i, int argc, char *argv[], int *p)
 {
     char *arg = GET_ARGV(i, "int");
-    *p = arg ? atoi(arg) : 0;
-    return arg ? ++i : -1;
+    if (arg) {
+        int b_err = str_2_int(arg, p);
+        return (++i) * (b_err ? -1 : 1);
+    } else {
+        return -1;
+    }
 }
 
 int opt_parse_int(int i, int argc, char *argv[], int *p, int default_val)
 {
     char *arg = GET_ARGV(i, "int");
-    *p = arg ? atoi(arg) : default_val;
-    return arg ? ++i : i;
+    if (arg) {
+        int b_err = str_2_int(arg, p);
+        return (++i) * (b_err ? -1 : 1);
+    } else {
+        *p = default_val;
+        return i;
+    }
 }
 
 int arg_parse_ints(int i, int argc, char *argv[], int n, int *p[])
@@ -617,7 +639,7 @@ int cmdl_parse_opt(int i, int argc, char *argv[], opt_desc_t *opt)
             }
             
             strncpy(splbuf, opt->refs[opt->i_ref].val, 1024);
-            arg_count = str_2_field(splbuf, 256, spl);
+            arg_count = str_2_fields(splbuf, 256, spl);
             if (arg_count>=256) {
                 xerr("strspl() overflow\n");
                 return -i;

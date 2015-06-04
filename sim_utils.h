@@ -53,12 +53,39 @@ int is_in_range(int v, int min, int max);
 int clip(int v, int minv, int maxv);
 
 char* get_uint32 (char *str, uint32_t *out);
-int get_token_pos(const char* str, int search_from,
+int get_1st_field(const char* str, int search_from,
                    const char* prejumpset,
                    const char* delemiters,
-                   int *stoken_start);
+                   int *field_start);
 
-int str_2_field(char *record, int arrSz, char *fieldArr[]);
-const char *search_in_fields(const char *filed, const char *record);
+int str_2_fields(char *record, int arrSz, char *fieldArr[]);
+const char *field_in_record(const char *filed, const char *record);
+
+typedef enum {
+    SCAN_OK = 0,
+    SCAN_ERR_OVERFLOW   = (1<<1),
+    SCAN_ERR_OUTOFSET   = (1<<2),
+    SCAN_ERR_NOBEGIN    = (1<<3),
+    SCAN_ERR_NOCLOSE    = (1<<5),
+    SCAN_ERR_NNULEND    = (1<<6),
+}scan_ret_t;
+
+/**
+ * @param [i] max  
+ * @param [o] ret_ only useful if (@return == 0)
+ * @param [o] end_ 
+ * @return: 0 if success, else @see scan_ret_t
+ */
+int scan_for_uint64_npre(const char *_str, uint32_t base, uint64_t max, uint64_t *ret_, const char **end_);
+int scan_for_uint64_pre(const char *_str, uint64_t max, uint64_t *ret_, const char **end_);
+int scan_for_uint64(const char *_str, uint64_t *ret_, const char **end_);
+int scan_for_uint32(const char *_str, uint32_t *ret_, const char **end_);
+int scan_for_uint16(const char *_str, uint16_t *ret_, const char **end_);
+int scan_for_int64(const char *_str, int64_t *ret_, const char **end_);
+int scan_for_int32(const char *_str, int32_t *ret_, const char **end_);
+int scan_for_int16(const char *_str, int16_t *ret_, const char **end_);
+int scan_for_float(const char *_str, float *ret_, const char **end_);
+int str_2_uint(const char *_str, unsigned int *ret_);
+int str_2_int(const char *_str, int *ret_);
 
 #endif  // __SIM_UTILS_H__

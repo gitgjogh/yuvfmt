@@ -1064,7 +1064,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
     }
     
     const char* start_opts = "h, help, i, src, o, dst, x, xl, xlevel, xall, xnon";
-    if (argv[1][0]!='-' || 0 > search_in_fields(argv[1], start_opts))
+    if (argv[1][0]!='-' || 0 > field_in_record(argv[1], start_opts))
     {
         xerr("1st opt not in `%s`\n", start_opts);
         return -1;

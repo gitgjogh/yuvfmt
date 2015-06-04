@@ -72,6 +72,8 @@ int xerrv(const char *fmt, va_list ap);
 int xerr (const char *fmt, ...);
 int xdbgv(const char *fmt, va_list ap);
 int xdbg (const char *fmt, ...);
+int xwarnv(const char *fmt, va_list ap);
+int xwarn (const char *fmt, ...);
 
 static int fcall_layer = 0;
 #define ENTER_FUNC()  xlog(SLOG_FUNC, "@>>>> %-2d: %s(+)\n", fcall_layer++, __FUNCTION__)
@@ -109,6 +111,8 @@ int     arg_parse_str(int i, int argc, char *argv[], char **p);
 int     arg_parse_strcpy(int i, int argc, char *argv[], char *buf, int nsz);
 int     arg_parse_int(int i, int argc, char *argv[], int *p);
 int     opt_parse_int(int i, int argc, char *argv[], int *p, int default_val);
+int     arg_parse_ints(int i, int argc, char *argv[], int n, int *p[]);
+int     opt_parse_ints(int i, int argc, char *argv[], int n, int *p[]);
 int     arg_parse_xlevel(int i, int argc, char *argv[]);
 
 
