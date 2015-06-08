@@ -52,6 +52,11 @@ int is_bit_aligned(int nbit, int val);
 int is_in_range(int v, int min, int max);
 int clip(int v, int minv, int maxv);
 
+int num_leading_zero_bits_u64(uint64_t val);
+int num_leading_zero_bits_u32(uint32_t val);
+#define NLZB32(val)     (num_leading_zero_bits_u32(val))
+#define NLZB64(val)     (num_leading_zero_bits_u64(val))
+
 char* get_uint32 (char *str, uint32_t *out);
 int get_1st_field(const char* str, int search_from,
                    const char* prejumpset,

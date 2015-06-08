@@ -46,6 +46,43 @@ int is_bit_aligned(int nbit, int val)
 }
 
 
+#define SIM_LZB_BIT(bit)            \
+    b   = val >= (1<<(1<<(bit)));   \
+    n  += b ?  0  :  (1<<(bit)) ;   \
+    val = b ?  (val>>(1<<(bit))) : val;
+    
+int num_leading_zero_bits_u64(uint64_t val)
+{
+    int n = 0;
+    uint64_t    b;
+    
+    SIM_LZB_BIT(5)          /* get the 5-th bit of n */
+    SIM_LZB_BIT(4)
+    SIM_LZB_BIT(3)
+    SIM_LZB_BIT(2)
+    SIM_LZB_BIT(1)
+    SIM_LZB_BIT(0)          /* get the 1-th bit of n */
+   
+    n  += (val<1);          /* get the carry bit of n */
+    return n;
+}
+
+int num_leading_zero_bits_u32(uint32_t val)
+{
+    int n = 0;
+    uint32_t    b;
+    
+    SIM_LZB_BIT(4)          /* get the 4-th bit of n */
+    SIM_LZB_BIT(3)
+    SIM_LZB_BIT(2)
+    SIM_LZB_BIT(1)
+    SIM_LZB_BIT(0)          /* get the 1-th bit of n */
+   
+    n  += (val<1);          /* get the carry bit of n */
+    return n;
+}
+
+
 int clip(int v, int minv, int maxv)
 {
     v = (v<minv) ? minv : v;
