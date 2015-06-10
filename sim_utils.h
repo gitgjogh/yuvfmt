@@ -44,7 +44,31 @@
 
 #define IS_IN_RANGE(v, min, max) \
     (((min)<=(max)) && ((min)<=(v)) && ((max)>=(v)))
-    
+
+#define IS_LTE()        ((uint8_t)((uint32_t)0x00000001))
+#define IS_BGE()        ((uint8_t)((uint32_t)0x01000000))
+void mem_put_lte16(uint8_t *mem, uint32_t val);
+void mem_put_lte32(uint8_t *mem, uint32_t val);
+
+#define LSBSMASK(nbit)                  (((1<<(nbit)) - 1))
+#define BITSMASK(ibit, nbit)            (((1<<(nbit)) - 1) << (ibit))
+
+#define CLEARBITS(val, ibit, nbit)      ((val) & ~BITSMASK(ibit, nbit))
+#define CLEARLSBS(val, nbit)            ((val) >> (nbit) << (nbit))
+#define CLEARMSBS(val, nbit)            ((val) << (nbit) >> (nbit))
+
+#define GETBITS(val, ibit, nbit)        (((val)>>(ibit)) & LSBSMASK(nbit))
+#define GETLSBS(val, nbit)              ((val) & LSBSMASK(nbit))
+#define GETMSBS(val, nbit)              ((val)>>(32-(nbit)))
+#define GETBIT(val, ibit)               (((val)>>(ibit)) & 1)
+
+#define SETBITS(val, ibit, nbit, src)   (CLEARBITS(val, ibit, nbit) | (GETLSBS(src, nbit)<<(ibit)))
+#define SETLSBS(val, nbit, src)         (CLEARMSBS(val, nbit) | GETLSBS((src), (nbit)))
+#define SETMSBS(val, nbit, src)         (CLEARMSBS(val, nbit) | ((src)<<(32-(nbit))))
+
+#define ENDIAN_REVERSE_32(val)          (((val)<<24)|(((val)&0xff00)<<16)|(((val)&0xff000)>>8)|((val)>>24))
+#define BGE2LTE_32      ENDIAN_REVERSE_32
+#define LTE2BGE_32      ENDIAN_REVERSE_32
     
 int sat_div(int num, int den);
 int bit_sat(int nbit, int val);
