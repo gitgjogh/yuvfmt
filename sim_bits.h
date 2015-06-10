@@ -31,11 +31,12 @@ typedef struct simple_bitstream
     struct {
         uint8_t     *base;
         uint32_t    size;
-        uint32_t    ibyte;
-        uint32_t    obyte;
     } buf;
 
     struct {
+        uint32_t    wbyte;          /** Next bytePos to be wrote out */
+        uint32_t    rbyte;          /** Next bytePos to be read in */
+        
         uint32_t    reg1;           /** Cached reg1 */
         uint32_t    reg2;           /** Cached reg2 */
         uint32_t    nbit;           /** Num of bits in cache. Normally 64, 

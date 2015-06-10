@@ -27,7 +27,7 @@
 int sbs_fill_cache(sim_bs_t *bs)
 {   
     xdbg("@sbs>> bs@0x%08x[0x%08x], pre cache(0x-%08x-%08x)\n", 
-        bs->buf.base, bs->buf.ibyte, bs->cache.reg1, bs->cache.reg2);
+        bs->buf.base, bs->cache.rbyte, bs->cache.reg1, bs->cache.reg2);
 
     if (bs->cache.nbit & 7 || bs->cache.nbit > 64) {
         xerr("@sbs>> cache.nbit = %d\n", bs->cache.nbit);
@@ -35,7 +35,7 @@ int sbs_fill_cache(sim_bs_t *bs)
         return SBS_BUG;
     }
 
-    if (bs->buf.ibyte >= bs->buf.size) {
+    if (bs->cache.rbyte >= bs->buf.size) {
         xerr("@sbs>> already EOS\n");
         bs->state |= SBS_EOS;
         return SBS_EOS;
@@ -46,9 +46,9 @@ int sbs_fill_cache(sim_bs_t *bs)
         return  SBS_ERR;
     }
 
-    while((bs->cache.nbit < 64) && (bs->buf.ibyte < bs->buf.size)) 
+    while((bs->cache.nbit < 64) && (bs->cache.rbyte < bs->buf.size)) 
     {
-        uint32_t currByte = bs->buf.base[ bs->buf.ibyte ++ ];
+        uint32_t currByte = bs->buf.base[ bs->cache.rbyte ++ ];
         bs->cache.nbit += 8;
         if (bs->cache.nbit <= 32) {
             bs->cache.reg1 |= currByte<<(32 - bs->cache.nbit);
@@ -58,9 +58,9 @@ int sbs_fill_cache(sim_bs_t *bs)
     }
 
     xdbg("@sbs>> bs@0x%08x[0x%08x], bre cache(0x-%08x-%08x)\n", 
-        bs->buf.base, bs->buf.ibyte, bs->cache.reg1, bs->cache.reg2);
+        bs->buf.base, bs->cache.rbyte, bs->cache.reg1, bs->cache.reg2);
 
-    bs->state |= (bs->buf.ibyte < bs->buf.size) ? bs->state : SBS_EOS;
+    bs->state |= (bs->cache.rbyte < bs->buf.size) ? bs->state : SBS_EOS;
     return SBS_OK;
 }
 
@@ -77,8 +77,8 @@ uint32_t sbs_seek2pos(sim_bs_t *bs, uint32_t bytePos, uint32_t ibit)
     }
 
     bs->state       = SBS_OK;
-    bs->buf.ibyte   = bytePos;
-    bs->buf.obyte   = bytePos;
+    bs->cache.rbyte   = bytePos;
+    bs->cache.wbyte   = bytePos;
 
     bs->cache.ibit  = ibit;
     bs->cache.nbit  = 0;
@@ -194,10 +194,10 @@ uint32_t sbs_coverbits(sim_bs_t *bs, uint32_t val, int nbit, int b_force_flush)
         SETLSBS(bs->cache.reg1, 32-pos0, val_msb);
         SETMSBS(bs->cache.reg2, pos1-32, val_lsb);
 
-        mem_put_lte32(bs->buf.base + bs->buf.obyte, bs->cache.reg1);
+        mem_put_lte32(bs->buf.base + bs->cache.wbyte, bs->cache.reg1);
         
-        bs->buf.obyte  += 4;
-        bs->buf.ibyte  += 4;
+        bs->cache.wbyte  += 4;
+        bs->cache.rbyte  += 4;
         bs->cache.reg1  = bs->cache.reg2;
         bs->cache.reg2  = 0;
         bs->cache.ibit -= 32;
@@ -207,7 +207,7 @@ uint32_t sbs_coverbits(sim_bs_t *bs, uint32_t val, int nbit, int b_force_flush)
     }
     
     if (b_force_flush) {
-        mem_put_lte32(bs->buf.base + bs->buf.obyte, bs->cache.reg1);
+        mem_put_lte32(bs->buf.base + bs->cache.wbyte, bs->cache.reg1);
     }
 
     return r;
@@ -237,10 +237,10 @@ uint32_t sbs_putbits(sim_bs_t *bs, uint32_t val, int nbit)
 
         uint32_t bge32 = bs->cache.reg1;
         uint32_t lte32 = BGE2LTE_32(bge32);
-        *((uint32_t *)(bs->buf.base + bs->buf.obyte)) = lte32;
+        *((uint32_t *)(bs->buf.base + bs->cache.wbyte)) = lte32;
         
-        bs->buf.obyte  += 4;
-        bs->buf.ibyte  += 4;
+        bs->cache.wbyte  += 4;
+        bs->cache.rbyte  += 4;
         bs->cache.reg1  = bs->cache.reg2;
         bs->cache.reg2  = 0;
         bs->cache.ibit -= 32;
@@ -254,11 +254,11 @@ uint32_t sbs_putbits(sim_bs_t *bs, uint32_t val, int nbit)
 uint32_t sbs_flushout(sim_bs_t *bs)
 {
     if (bs->cache.nbit > 0) {
-        mem_put_lte32(bs->buf.base + bs->buf.obyte, bs->cache.reg1);
+        mem_put_lte32(bs->buf.base + bs->cache.wbyte, bs->cache.reg1);
     }
     
     if (bs->cache.nbit > 32) {
-        mem_put_lte32(bs->buf.base + bs->buf.obyte + 4, bs->cache.reg2);
+        mem_put_lte32(bs->buf.base + bs->cache.wbyte + 4, bs->cache.reg2);
     }
     
     return 0;
