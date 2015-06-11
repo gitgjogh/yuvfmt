@@ -266,7 +266,8 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "iosize")) {
             i = arg_parse_int(i, argc, argv, &seq->io_size);
         } else
-        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "n")) {
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "nframe") ||
+            0==strcmp(arg, "f")       || 0==strcmp(arg, "frame")) {
             int nframe = 0;
             i = arg_parse_int(i, argc, argv, &nframe);
             cfg->frame_range[1] = nframe + cfg->frame_range[0];
@@ -274,7 +275,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "f-start")) {
             i = arg_parse_int(i, argc, argv, &cfg->frame_range[0]);
         } else
-        if (0==strcmp(arg, "f-range") || 0==strcmp(arg, "f")) {
+        if (0==strcmp(arg, "f-range")) {
             i = arg_parse_range(i, argc, argv, cfg->frame_range);
         } else
         if (0==strcmp(arg, "blksz")) {
@@ -367,6 +368,13 @@ int cmp_arg_help()
     printf("\t-wxh <%%dx%%d>\n");
     printf("\t-i0 name<%%s> {...yuv props...} \n");
     printf("\t-i1 name<%%s> {...yuv props...} \n");
+    printf("\t ...frame range...   <%%d~%%d>\n");
+
+    printf("\nset frame range as follow:\n");
+    printf("\t [-f-range    <%%d~%%d>]\n");
+    printf("\t [-f-start    <%%d>]\n");
+    printf("\t [-frame|-f   <%%d>]\n");
+
     printf("\n...yuv props...\n");
     printf("\t [-fmt <%%420p,%%420sp,%%uyvy,%%422p>]\n");
     printf("\t [-wxh <%%d>x<%%d>]\n");

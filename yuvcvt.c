@@ -1148,7 +1148,8 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
             i = opt_parse_int(i, argc, argv, &seq->btile, 1);
             seq->btile ? (seq->yuvfmt = YUVFMT_420SP) : 0;
         } else  
-        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "nframe") ||0==strcmp(arg, "n")) {
+        if (0==strcmp(arg, "n-frame") || 0==strcmp(arg, "nframe") ||
+            0==strcmp(arg, "f")       || 0==strcmp(arg, "frame")) {
             int nframe = 0;
             i = arg_parse_int(i, argc, argv, &nframe);
             cfg->frame_range[1] = nframe + cfg->frame_range[0];
@@ -1156,7 +1157,7 @@ int cvt_arg_parse(cvt_opt_t *cfg, int argc, char *argv[])
         if (0==strcmp(arg, "f-start")) {
             i = arg_parse_int(i, argc, argv, &cfg->frame_range[0]);
         } else
-        if (0==strcmp(arg, "f-range") || 0==strcmp(arg, "f")) {
+        if (0==strcmp(arg, "f-range")) {
             i = arg_parse_range(i, argc, argv, cfg->frame_range);
         } else
         if (0==strcmp(arg, "stride")) {
@@ -1251,7 +1252,12 @@ int cvt_arg_help()
     printf("yuv format convertor. Options:\n");
     printf("\t -i|-dst name<%%s> {...props...}\n");
     printf("\t -o|-src name<%%s> {...props...}\n");
-    printf("\t -f   <%%d~%%d>\n");
+    printf("\t ...frame range...   <%%d~%%d>\n");
+
+    printf("\nset frame range as follow:\n");
+    printf("\t [-f-range    <%%d~%%d>]\n");
+    printf("\t [-f-start    <%%d>]\n");
+    printf("\t [-frame|-f   <%%d>]\n");
     
     printf("\nset yuv props as follow:\n");
     printf("\t [-wxh <%%dx%%d>]\n");
@@ -1260,11 +1266,6 @@ int cvt_arg_help()
     printf("\t [-iosize <%%d>]  //frame buf size\n");
     printf("\t [-b10]\n");
     printf("\t [-btile|-tile|-t]\n");
-    
-    printf("\nset frame range as follow:\n");
-    printf("\t [-f-range|-f <%%d~%%d>]\n");
-    printf("\t [-f-start    <%%d>]\n");
-    printf("\t [-n-frame|-n <%%d>]\n");
     
     int j;
     printf("\n-wxh option can be short as follow:\n");
