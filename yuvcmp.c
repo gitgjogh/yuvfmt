@@ -183,6 +183,8 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
      */    
     for (i=1; i>=0 && i<argc; )
     {
+        xdbg("@cmdl>> argv[%d]=%s\n", i, argv[i]);
+
         char *arg = argv[i];
         if (arg[0]!='-') {
             xerr("`%s` is not an option\n", arg);
@@ -219,6 +221,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
         }
         
         arg += 1;
+        ++i;
 
         if (0==strcmp(arg, "h") || 0==strcmp(arg, "help")) {
             cmp_arg_help();
@@ -249,7 +252,7 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_fmt(i, argc, argv, &seq->yuvfmt);
         } else
         if (0==strcmp(arg, "b10")) {
-            ++i;    seq->nbit = 10;     seq->nlsb = 10;
+            seq->nbit = 10;     seq->nlsb = 10;
         } else
         if (0==strcmp(arg, "nbit") || 0==strcmp(arg, "b")) {
             i = arg_parse_int(i, argc, argv, &seq->nbit);
@@ -258,7 +261,8 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_int(i, argc, argv, &seq->nlsb);
         } else
         if (0==strcmp(arg, "btile") || 0==strcmp(arg, "tile") || 0==strcmp(arg, "t")) {
-            ++i;    seq->btile = 1;     seq->yuvfmt = YUVFMT_420SP;
+            i = opt_parse_int(i, argc, argv, &seq->btile, 1);
+            seq->btile ? (seq->yuvfmt = YUVFMT_420SP) : 0;
         } else
         if (0==strcmp(arg, "stride")) {
             i = arg_parse_int(i, argc, argv, &seq->y_stride);
@@ -282,10 +286,10 @@ int cmp_arg_parse(cmp_opt_t *cfg, int argc, char *argv[])
             i = arg_parse_range(i, argc, argv, &cfg->blksz);
         } else
         if (0==strcmp(arg, "xnon")) {
-            ++i;    xlevel(SLOG_NON);
+            xlevel(SLOG_NON);
         } else
         if (0==strcmp(arg, "xall")) {
-            ++i;    xlevel(SLOG_ALL);
+            xlevel(SLOG_ALL);
         } else
         if (0==strcmp(arg, "x") || 0==strcmp(arg, "xlevel")) {
             int level;
