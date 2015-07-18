@@ -24,20 +24,14 @@ BINSRCS = yuvmain.c
 BINOBJS = $(BINSRCS:%.c=$(TMPDIR)/%.o)
 OUTBIN = yuv
 
-TIMESTAMP = .timestamp
 
 .PHONY: all
-all : $(TIMESTAMP) $(LIBSIM) $(LIBYUV) $(OUTBIN) 
+all : $(LIBSIM) $(LIBYUV) $(OUTBIN) 
 
-$(TIMESTAMP): Makefile
-	@echo; echo "[TS] update '$@' ..."
-	@if [ -d $(TMPDIR) ]; then echo "rm $(TMPDIR)/*"; rm -rf $(TMPDIR); fi
-	touch $@
 
 .PHONY: clean
 clean: 
 	@echo; echo "cleaning ..."
-	rm -rf $(TIMESTAMP)
 	rm -rf $(TMPDIR)
 	rm -rf $(LIBSIM)
 	rm -rf $(LIBYUV)
