@@ -1,4 +1,4 @@
-LIBSIMDIRS = libsim
+LIBSIMDIRS = zbase/libsim
 LIBYUVDIRS = libyuv
 INCLUDES = $(LIBSIMDIRS):$(LIBYUVDIRS)
 LIBSIM = $(LIBSIMDIRS)/libsim.a

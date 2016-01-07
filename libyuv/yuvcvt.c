@@ -1236,8 +1236,8 @@ int cvt_arg_check(cvt_opt_t *cfg, int argc, char *argv[])
     pdst->height = psrc->height;
     set_yuv_prop_by_copy(psrc, 0, psrc);
     set_yuv_prop_by_copy(pdst, 0, pdst);
-    show_yuv_prop(psrc, SLOG_CFG, "@cfg>> src: ");
-    show_yuv_prop(pdst, SLOG_CFG, "@cfg>> dst: ");
+    show_yuv_prop(psrc, SLOG_CMDL, "@cfg>> src: ");
+    show_yuv_prop(pdst, SLOG_CMDL, "@cfg>> dst: ");
     
     LEAVE_FUNC();
     
@@ -1322,7 +1322,7 @@ int yuv_cvt(int argc, char **argv)
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        xlog(SLOG_L1, "@frm> #%d +\n", i);
+        xprint("@frm> #%d +\n", i);
         r=fseek(cfg.ios[CVT_IOS_SRC].fp, cfg.src.io_size * i, SEEK_SET);
         if (r) {
             xerr("fseek %d error\n", cfg.src.io_size * i);
@@ -1333,7 +1333,7 @@ int yuv_cvt(int argc, char **argv)
         r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
             if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
-                xlog(SLOG_INFO, "@seq> reach file end, force stop\n");
+                xinfo("@seq> reach file end, force stop\n");
             } else {
                 xerr("error reading file\n");
             }
@@ -1348,7 +1348,7 @@ int yuv_cvt(int argc, char **argv)
             xerr("error writing file\n");
             break;
         }
-        xlog(SLOG_L1, "@frm> #%d -\n", i);
+        xprint("@frm> #%d -\n", i);
     } // end frame loop
     
     cvt_arg_close(&cfg);

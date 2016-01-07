@@ -230,7 +230,7 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
     if (new_buf) {
         yuv->pbuf = new_buf;
         yuv->buf_size = buf_size;
-        xlog(SLOG_MEM, "@buf>> yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
+        xlog(SLOG_MEM, "buf", "yuv_buf_realloc(%d) = 0x%08x\n", buf_size, new_buf);
     } else {
         xerr("@buf>> yuv_buf_malloc(%d) failed\n", buf_size);
     }
@@ -240,7 +240,7 @@ int yuv_buf_realloc(yuv_seq_t *yuv, int buf_size)
 void yuv_buf_free(yuv_seq_t *yuv)
 {
     if (yuv && yuv->pbuf) {
-        xlog(SLOG_MEM, "@buf>> yuv_buf_free() = 0x%08x\n", yuv->pbuf);
+        xlog(SLOG_MEM, "buf", "yuv_buf_free() = 0x%08x\n", yuv->pbuf);
         free(yuv->pbuf);
         yuv->pbuf = 0;
         yuv->buf_size = 0;
@@ -249,12 +249,12 @@ void yuv_buf_free(yuv_seq_t *yuv)
 
 void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
 {
-#define XTR_X(v) xlog(level, #v "=0x%08x, ", yuv->v)
-#define XTR_I(v) xlog(level, #v "=%d, ", yuv->v)
+#define XTR_X(v) xlog(level, 0, #v "=0x%08x, ", yuv->v)
+#define XTR_I(v) xlog(level, 0, #v "=%d, ", yuv->v)
 
     const char* show_fmt(int ifmt);
 
-    xlog(level, "%s@0x%08x : {", SAFE_STR(prompt,""), yuv); 
+    xlog(level, prompt, " yuv@0x%08x : {", yuv); 
     if (!yuv) {
         return;
     }
@@ -262,7 +262,7 @@ void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
     XTR_I(width     );
     XTR_I(height    );
     XTR_I(yuvfmt    );      
-    xlog(level, "(%s), ", show_fmt(yuv->yuvfmt));
+    xlog(level, 0, "(%s), ", show_fmt(yuv->yuvfmt));
     XTR_I(nlsb      );
     XTR_I(nbit      );
     XTR_I(btile     );
@@ -277,5 +277,5 @@ void show_yuv_prop(yuv_seq_t *yuv, int level, const char *prompt)
     XTR_I(tile.th   );
     XTR_I(tile.tsz  );
     
-    xlog(level, "}\n");
+    xlog(level, 0, "}\n");
 }

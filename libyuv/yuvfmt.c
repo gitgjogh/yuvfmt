@@ -67,7 +67,7 @@ int yuv_prop_parser(int i, int argc, char *argv[], yuv_seq_t *yuv, int b_help)
     opt_desc_t fmt_opt[] = 
     {
         { "*fmt",    OPT_T_INTI, 1, &yuv->yuvfmt, "%420p",  "yuvfmt",  },//0, n_cmn_fmt, cmn_fmt},
-        { "*wxh",    OPT_T_INTI, 2, wxh,        0,     "w & h",   },//n_cmn_wxh, 0, cmn_wxh},
+        { "*wxh",    OPT_T_INTI, 2,  wxh,            0,     "w & h",   },//n_cmn_wxh, 0, cmn_wxh},
         { "*nbit",   OPT_T_INTI, 1, &yuv->nbit,     "8",    "",        },//0, n_cmn_bit, cmn_bit},
         { "*nlsb",   OPT_T_INTI, 1, &yuv->nlsb,     "0",    ""},
         { "*tile",   OPT_T_BOOL, 1, &yuv->btile,     0,     ""},
@@ -149,7 +149,7 @@ int fmt_arg_parse(fmt_opt_t *cfg, int argc, char *argv[])
             xerr("@cmdl>> argv[%d] = `%s` is not option\n", i, arg);
             return -i;
         }
-        xlog(SLOG_CMDL, "@cmdl>> argv[%i] = %s\n", i, arg);
+        xlog(SLOG_CMDL, "cmdl", "argv[%i] = %s\n", i, arg);
         arg += 1;
         
         for (j=0; j<n_cmn_res; ++j) {
@@ -272,8 +272,8 @@ int fmt_arg_check(fmt_opt_t *cfg, int argc, char *argv[])
     pdst->height = psrc->height;
     set_yuv_prop_by_copy(psrc, 0, psrc);
     set_yuv_prop_by_copy(pdst, 0, pdst);
-    show_yuv_prop(psrc, SLOG_CFG, "@cfg>> src: ");
-    show_yuv_prop(pdst, SLOG_CFG, "@cfg>> dst: ");
+    show_yuv_prop(psrc, SLOG_CMDL, "@cfg>> src: ");
+    show_yuv_prop(pdst, SLOG_CMDL, "@cfg>> dst: ");
     
     LEAVE_FUNC();
     
@@ -287,18 +287,18 @@ int fmt_arg_close(fmt_opt_t *cfg)
 
 int fmt_arg_help(fmt_opt_t *cfg, int argc, char *argv[])
 {
-    printf("yuv format convertor. Options:\n");
-    printf("\t -dst name<%%s> {...props...}\n");
-    printf("\t -src name<%%s> {...props...}\n");
-    printf("\t [%% frame_range %%]\n");
+    xprint("yuv format convertor. Options:\n");
+    xprint("\t -dst name<%%s> {...props...}\n");
+    xprint("\t -src name<%%s> {...props...}\n");
+    xprint("\t [%% frame_range %%]\n");
     
-    printf("\nset yuv props as follow:\n");
+    xprint("\nset yuv props as follow:\n");
     yuv_prop_parser(0, 0, 0, &cfg->src, 1);
     
-    printf("\nset frame_range as follow:\n");
-    printf("\t [-f-range|-f <%%d~%%d>]\n");
-    printf("\t [-f-start    <%%d>]\n");
-    printf("\t [-n-frame|-n <%%d>]\n");
+    xprint("\nset frame_range as follow:\n");
+    xprint("\t [-f-range|-f <%%d~%%d>]\n");
+    xprint("\t [-f-start    <%%d>]\n");
+    xprint("\t [-n-frame|-n <%%d>]\n");
     return 0;
 }
 
@@ -345,7 +345,7 @@ int yuv_fmt(int argc, char **argv)
      ************************************************************************/
     for (i=cfg.frame_range[0]; i<cfg.frame_range[1]; i++) 
     {
-        xlog(SLOG_L1, "@frm> #%d +\n", i);
+        xprint("@frm>> #%d -\n", i);
         r=fseek(cfg.ios[CVT_IOS_SRC].fp, cfg.src.io_size * i, SEEK_SET);
         if (r) {
             xerr("fseek %d error\n", cfg.src.io_size * i);
@@ -355,7 +355,7 @@ int yuv_fmt(int argc, char **argv)
         r = fread(seq[0].pbuf, cfg.src.io_size, 1, cfg.ios[CVT_IOS_SRC].fp);
         if (r<1) {
             if ( ios_feof(cfg.ios, CVT_IOS_SRC) ) {
-                xlog(SLOG_INFO, "@seq> reach file end, force stop\n");
+                xinfo("@seq>> reach file end, force stop\n");
             } else {
                 xerr("error reading file\n");
             }
@@ -371,7 +371,7 @@ int yuv_fmt(int argc, char **argv)
             xerr("error writing file\n");
             break;
         }
-        xlog(SLOG_L1, "@frm> #%d -\n", i);
+         xprint("@frm>> #%d -\n", i);
     } // end frame loop
     
     fmt_arg_close(&cfg);

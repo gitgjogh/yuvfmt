@@ -352,8 +352,8 @@ int cmp_arg_check(cmp_opt_t *cfg, int argc, char *argv[])
     cfg->seq[2].height = cfg->seq[1].height = cfg->seq[0].height;
     for (i=0; i<3; ++i) {
         set_yuv_prop_by_copy(&cfg->seq[i], 0, &cfg->seq[i]);
-        xlog(SLOG_CFG, "@cfg> yuv#%d: ", i);  
-        show_yuv_prop(&cfg->seq[i], SLOG_CFG, 0);
+        xdbg("@cfg> yuv#%d: ", i);  
+        show_yuv_prop(&cfg->seq[i], SLOG_DBG, 0);
     }
     
     LEAVE_FUNC();
@@ -439,7 +439,7 @@ int yuv_cmp(int argc, char **argv)
      ************************************************************************/
     for (j=cfg.frame_range[0]; j<cfg.frame_range[1]; j++) 
     {
-        xlog(SLOG_DBG, "@frm> **** %d ****\n", j);
+        xdbg("@frm> **** %d ****\n", j);
 
         for (i=0; i<2; ++i) 
         {
@@ -452,7 +452,7 @@ int yuv_cmp(int argc, char **argv)
             r = fread(seq[i].pbuf, seq[i].io_size, 1, cfg.ios[i].fp);
             if (r<1) {
                 if ( ios_feof(cfg.ios, i) ) {
-                    xlog(SLOG_L1, "@seq>> $%d: reach file end, force stop\n", i);
+                    xinfo("@seq>> $%d: reach file end, force stop\n", i);
                 } else {
                     xerr("@seq>> $%d: error reading file\n", i);
                 }
@@ -479,7 +479,7 @@ int yuv_cmp(int argc, char **argv)
         stat[0] = yuv_diff(spl[0], spl[1], ptmp, &stat[1]);
         
         psnr = get_stat_psnr(&stat[0]);
-        xlog(SLOG_L1, "@frm>> #%d: PSNR = %.2llf\n", j, psnr);
+        xprint("@frm>> #%d: PSNR = %.2llf\n", j, psnr);
         
         if (cfg.ios[2].fp) {
             set_yuv_prop_by_copy(spl[0], 1, &cfg.seq[2]);
@@ -493,7 +493,7 @@ int yuv_cmp(int argc, char **argv)
     }
     
     psnr = get_stat_psnr(&stat[1]);
-    xlog(SLOG_L0, "@seq>> PSNR = %.2llf\n", psnr);
+    xinfo("@seq>> PSNR = %.2llf\n", psnr);
     
     cmp_arg_close(&cfg);
     for (i=0; i<3; ++i) {
