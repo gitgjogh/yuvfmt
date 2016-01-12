@@ -38,10 +38,8 @@ int main(int argc, char **argv)
         {"fmt",     yuv_fmt,    "another yuvcvt with diff cmdl style"},
     };
 
-    xlog_init(SLOG_DBG-1);
+    xlog_init(SLOG_PRINT);
     i = arg_parse_xlevel(1, argc, argv);
-    
-    xdbg("@cmdl>> argv[%d] = %s\n", i, i<argc ? argv[i] : "?");
 
     if (i>=argc) {
         printf("No module specified. ");

@@ -89,8 +89,13 @@ typedef struct _rect
 
 typedef struct _yuv_seq 
 {
-    int     width;
-    int     height;
+    union {
+        struct {
+            int     width;
+            int     height;
+        };
+        int wxh[2];
+    };
     int     yuvfmt;
     int     nbit;
     int     nlsb;

@@ -29,7 +29,7 @@ $(OUTBIN): $(BINOBJS) $(LIBSIM) $(LIBYUV) | libyuv
 	@echo; echo "[LD] linking ..."
 	cc -I$(LIBSIMDIRS) -I$(LIBYUVDIRS) -o $@ $^ 
 
-$(BINOBJS): $(LIBYUV) *.h Makefile
+$(BINOBJS): $(LIBYUV) Makefile
 $(BINOBJS): $(TMPDIR)/%.o:%.c | $(TMPDIR)
 	@echo; echo "[CC] compiling: $< "
 	$(CC) $(CFLAGS) -I$(LIBSIMDIRS) -I$(LIBYUVDIRS) -l$(LIBSIM) -l$(LIBYUV) -o $@ $<
